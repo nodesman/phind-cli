@@ -38,8 +38,8 @@ export const runCli = (
 ): CliResult => {
     const cliPath = path.resolve(__dirname, '../../bin/cli.js');
 
-    // --- FIX START: Force locale to ensure consistent English output ---
-    const processEnv = {
+    // --- FIX START: Explicitly type processEnv ---
+    const processEnv: NodeJS.ProcessEnv = {
         ...process.env,
         ...env,
         LC_ALL: 'C' // Force POSIX/English locale
@@ -50,6 +50,7 @@ export const runCli = (
 
     if (noGlobalIgnoreFlag) {
         // Explicitly set to undefined for robust unsetting
+        // Now TypeScript knows this property *can* exist on processEnv
         processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
     } else {
         if (globalIgnorePath === null) {
@@ -58,10 +59,10 @@ export const runCli = (
         } else if (globalIgnorePath) {
              processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = path.resolve(cwd, globalIgnorePath);
         } else {
+             // Default: ensure it's not set if not provided or undefined
              processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
         }
     }
-
 
     const result = spawn.sync(process.execPath, [cliPath, ...args], {
         cwd,
@@ -91,4 +92,3 @@ export const normalizeAndSort = (lines: string[]) => {
         .map(line => path.normalize(line).replace(/\\/g, '/')) // Normalize separators
         .sort();
 }
-```
