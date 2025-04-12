@@ -30,12 +30,34 @@ interface CliResult {
     error?: Error;
 }
 
-export const runCli = (args: string[], cwd: string, env?: NodeJS.ProcessEnv): CliResult => {
+export const runCli = (
+    args: string[],
+    cwd: string,
+    env?: NodeJS.ProcessEnv,
+    globalIgnorePath?: string | null // Add optional parameter
+): CliResult => {
     const cliPath = path.resolve(__dirname, '../../bin/cli.js'); // Adjust path to compiled cli.js
+
+    // Create a mutable copy of the environment to modify
+    const processEnv = { ...process.env, ...env }; // Merge base env and specific test env
+
+    // Set or unset the override environment variable based on the parameter
+    if (globalIgnorePath === null) {
+         // Explicitly unset if null is passed (e.g., for testing --no-global-ignore where the file might exist but shouldn't be used)
+         delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
+    } else if (globalIgnorePath) {
+         // Pass the absolute path to the test's global ignore file
+         // Resolve it relative to the cwd (testDir) where the command is run
+         processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = path.resolve(cwd, globalIgnorePath);
+    } else {
+        // If globalIgnorePath is undefined (not passed), clear any potential leftover from previous runs
+         delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
+    }
+
     const result = spawn.sync(process.execPath, [cliPath, ...args], {
         cwd,
         encoding: 'utf-8',
-        env: { ...process.env, ...env }, // Merge environment variables
+        env: processEnv, // Use the modified environment
     });
 
     const normalizeOutput = (output: string | null): string => (output || '').replace(/\r\n/g, '\n');

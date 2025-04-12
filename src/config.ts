@@ -15,6 +15,13 @@ export class PhindConfig {
     }
 
     private determineGlobalIgnoreFilePath(): string {
+        // Allow overriding via environment variable for testing
+        const testOverridePath = process.env.PHIND_TEST_GLOBAL_IGNORE_PATH;
+        if (testOverridePath) {
+            // Use the override path and ensure it's resolved absolutely
+            return path.resolve(testOverridePath);
+        }
+
         const homedir = os.homedir();
         let configDir: string;
 
@@ -37,6 +44,7 @@ export class PhindConfig {
         }
 
         try {
+            // Use the determined path (could be overridden)
             const content = await fs.readFile(this.globalIgnorePath, 'utf-8');
             this.globalIgnorePatterns = content
                 .split(/\r?\n/) // Split by newline (Windows or Unix)

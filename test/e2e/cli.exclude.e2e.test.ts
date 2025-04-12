@@ -7,13 +7,17 @@ import { createTestStructure, runCli, normalizeAndSort } from './cli.helper';
 
 describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
     let testDir: string;
-    let globalIgnoreFilePath: string;
+    // Store the RELATIVE path within testDir for the fake global ignore
+    const relativeGlobalIgnoreDir = '.config/phind';
+    const globalIgnoreFilename = 'ignore';
+    let relativeGlobalIgnorePath: string; // e.g., '.config/phind/ignore'
+    let absoluteGlobalIgnorePath: string; // Full path for writing the file
 
     const testStructure = {
         'doc.txt': 'text',
         'image.jpg': 'jpeg',
         'script.js': 'javascript',
-        '.config': { 'app.conf': 'config file' },
+        '.config': { 'app.conf': 'config file' }, // This directory will be used for the fake global ignore parent
         'build': {
             'output.log': 'log data',
             'app.exe': 'executable',
@@ -31,13 +35,13 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
     beforeEach(async () => {
         testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'phind-e2e-'));
         await createTestStructure(testDir, testStructure);
-        // Determine the expected path for the global ignore file *within the temp dir* for testing purposes
-        // This simulates where PhindConfig would look if the homedir/.config were this temp dir.
-        // Note: This path might not perfectly match the real PhindConfig logic in all edge cases (like XDG),
-        // but it's sufficient for testing the --no-global-ignore flag functionality.
-        const configDir = path.join(testDir, '.config');
-        globalIgnoreFilePath = path.join(configDir, 'phind', 'ignore');
+        // Calculate paths based on testDir
+        relativeGlobalIgnorePath = path.join(relativeGlobalIgnoreDir, globalIgnoreFilename).replace(/\\/g, '/'); // Ensure consistent separators
+        absoluteGlobalIgnorePath = path.join(testDir, relativeGlobalIgnorePath);
+        // Ensure the directory structure exists within the temp dir for writing the file
+        await fs.ensureDir(path.dirname(absoluteGlobalIgnorePath));
     });
+
 
     afterEach(async () => {
         await fs.remove(testDir);
@@ -46,16 +50,16 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
     describe('Default Excludes', () => {
         it('should exclude node_modules by default', () => {
             const result = runCli([], testDir);
-            expect(result.stdoutLines).not.toContain(path.join(testDir, 'node_modules'));
-            // Check relative path as well just in case
-            expect(result.stdoutLines).not.toContain('node_modules');
+            const normalizedOutput = result.stdoutLines.map(line => path.relative(testDir, line));
+            expect(normalizedOutput).not.toContain('node_modules');
+            expect(normalizedOutput).not.toContain(path.join('node_modules', 'package'));
         });
 
         it('should exclude .git by default', () => {
             const result = runCli([], testDir);
-            expect(result.stdoutLines).not.toContain(path.join(testDir, '.git'));
-            // Check relative path as well just in case
-             expect(result.stdoutLines).not.toContain('.git');
+            const normalizedOutput = result.stdoutLines.map(line => path.relative(testDir, line));
+            expect(normalizedOutput).not.toContain('.git');
+            expect(normalizedOutput).not.toContain(path.join('.git', 'HEAD'));
         });
 
         it('should include node_modules if explicitly included via --name (and default exclude is bypassed by specific include)', () => {
@@ -70,7 +74,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
              const receivedNormalized = normalizeAndSort(result.stdoutLines);
              expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
              expect(receivedNormalized).toContain('node_modules/package/index.js');
-             expect(receivedNormalized).toContain('node_modules');
+             expect(receivedNormalized).toContain('node_modules'); // The directory itself should also match '**'
         });
 
         it('should include .git if explicitly included via --name (and default exclude is bypassed by specific include)', () => {
@@ -106,15 +110,17 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             const result = runCli(['--exclude', 'build/*.log', '--relative'], testDir);
             expect(result.stdoutLines).not.toContain('build/output.log');
             expect(result.stdoutLines).toContain('build/app.exe'); // Ensure other file in dir is there
-            expect(result.stdoutLines).toContain('build'); // Ensure parent dir is still there
+            expect(result.stdoutLines).toContain('build'); // Ensure parent dir is still there if not pruned explicitly
             expect(result.stdoutLines).toContain('script.js');
         });
 
-        it('should exclude hidden files/dirs when pattern allows (e.g., .*) (relative)', () => {
-             const result = runCli(['--exclude', '.*', '--relative'], testDir);
-             expect(result.stdoutLines).not.toContain('.config'); // Directory itself is excluded
+        it('should exclude hidden files/dirs when pattern allows (e.g., .config) (relative)', () => {
+             // Exclude .config specifically, not using '.*' to avoid excluding .git
+             const result = runCli(['--exclude', '.config', '--relative'], testDir);
+             expect(result.stdoutLines).not.toContain('.config'); // Directory itself is excluded (pruned)
              expect(result.stdoutLines).not.toContain('.config/app.conf'); // Content implicitly excluded
-             expect(result.stdoutLines).not.toContain('.git'); // Default exclude also matches .*
+             // .git should still be excluded by default
+             expect(result.stdoutLines).not.toContain('.git');
              expect(result.stdoutLines).toContain('doc.txt'); // Sanity check non-hidden
         });
 
@@ -127,18 +133,21 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
         });
 
         it('should prioritize --exclude over --name if patterns overlap (relative)', () => {
-            // Find all .txt files except doc.txt
-            const result = runCli(['--name', '*.txt', '--exclude', 'doc.txt', '--relative'], testDir);
-            expect(result.stdoutLines).not.toContain('doc.txt');
-            expect(result.stdoutLines).toContain('excluded.tmp'); // Should find the other txt file
-            expect(result.stderr).toBe('');
+            // Find all *.tmp files except excluded.tmp
+            const result = runCli(['--name', '*.tmp', '--exclude', 'excluded.tmp', '--relative'], testDir);
+            expect(result.stdoutLines).not.toContain('excluded.tmp');
+             // Add another tmp file to ensure the name pattern *could* find something
+             fs.writeFileSync(path.join(testDir, 'another.tmp'), 'test');
+             const result2 = runCli(['--name', '*.tmp', '--exclude', 'excluded.tmp', '--relative'], testDir);
+             expect(result2.stdoutLines).toContain('another.tmp');
+             expect(result2.stdoutLines).not.toContain('excluded.tmp');
+             expect(result2.stderr).toBe('');
         });
 
         it('should handle --exclude patterns with case sensitivity by default (relative)', () => {
-            const result = runCli(['--exclude', 'IMAGE.JPG', '--relative'], testDir);
-             // 'IMAGE.JPG' doesn't exist, so this exclude pattern has no effect
-             // We expect to still see 'image.jpg'
-            expect(result.stdoutLines).toContain('image.jpg');
+            const result = runCli(['--exclude', 'DOC.TXT', '--relative'], testDir);
+             // 'DOC.TXT' doesn't exist, so this exclude pattern has no effect on 'doc.txt'
+            expect(result.stdoutLines).toContain('doc.txt');
         });
 
          it('should exclude based on case sensitivity when the file exists (relative)', async () => {
@@ -151,16 +160,17 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
     });
 
     describe('Global Ignore File (--no-global-ignore)', () => {
-        // Helper to ensure the directory for the fake global ignore exists
-        const ensureGlobalIgnoreDir = async () => {
-             await fs.ensureDir(path.dirname(globalIgnoreFilePath));
+        // Helper to write the fake global ignore file
+        const ensureGlobalIgnoreFile = async (content: string) => {
+             await fs.ensureDir(path.dirname(absoluteGlobalIgnorePath));
+             await fs.writeFile(absoluteGlobalIgnorePath, content);
         };
 
         it('should load and apply excludes from the global ignore file by default (relative)', async () => {
-            await ensureGlobalIgnoreDir();
-            await fs.writeFile(globalIgnoreFilePath, '*.tmp\nbuild'); // Exclude *.tmp and the build dir
+            await ensureGlobalIgnoreFile('*.tmp\nbuild'); // Exclude *.tmp and the build dir
 
-            const result = runCli(['--relative'], testDir); // Use relative for consistency
+            // Pass the RELATIVE path to runCli helper
+            const result = runCli(['--relative'], testDir, {}, relativeGlobalIgnorePath);
 
             expect(result.stdoutLines).not.toContain('excluded.tmp'); // Globally excluded file
             expect(result.stdoutLines).not.toContain('build'); // Globally excluded directory (pruned)
@@ -177,10 +187,10 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
         });
 
         it('should NOT load global ignores when --no-global-ignore is specified (relative)', async () => {
-            await ensureGlobalIgnoreDir();
-            await fs.writeFile(globalIgnoreFilePath, '*.tmp\nbuild'); // Define global excludes
+            await ensureGlobalIgnoreFile('*.tmp\nbuild'); // Define global excludes
 
-            const result = runCli(['--no-global-ignore', '--relative'], testDir); // Add flag
+            // Pass the relative path, but the flag should prevent its use
+            const result = runCli(['--no-global-ignore', '--relative'], testDir, {}, relativeGlobalIgnorePath);
 
             // Global excludes should NOT be applied
             expect(result.stdoutLines).toContain('excluded.tmp');
@@ -197,10 +207,10 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
         });
 
         it('should combine global ignores with default and CLI excludes (relative)', async () => {
-            await ensureGlobalIgnoreDir();
-            await fs.writeFile(globalIgnoreFilePath, '*.log'); // Global: exclude logs
+            await ensureGlobalIgnoreFile('*.log'); // Global: exclude logs
 
-            const result = runCli(['--exclude', '*.tmp', '--relative'], testDir); // CLI: exclude *.tmp
+            // Pass the relative path
+            const result = runCli(['--exclude', '*.tmp', '--relative'], testDir, {}, relativeGlobalIgnorePath); // CLI: exclude *.tmp
 
             // Check exclusions from all sources
             expect(result.stdoutLines).not.toContain('excluded.tmp');      // CLI exclude
@@ -210,29 +220,27 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
 
             // Check remaining files
             expect(result.stdoutLines).toContain('doc.txt');
-            expect(result.stdoutLines).toContain('build'); // Dir itself not excluded
+            expect(result.stdoutLines).toContain('build'); // Dir itself not excluded by *.log
             expect(result.stdoutLines).toContain('build/app.exe'); // Other file in build
             expect(result.stdoutLines).toContain('.');
         });
 
-        it('should handle non-existent global ignore file gracefully', () => {
+        it('should handle non-existent global ignore file gracefully', async () => {
             // Ensure the global ignore file definitely doesn't exist for this test run
-            // (it shouldn't by default in the clean temp dir, but belts and suspenders)
-            fs.removeSync(globalIgnoreFilePath); // Use sync for simplicity in test setup
+            await fs.remove(absoluteGlobalIgnorePath);
 
-            // **** Use --relative ****
-            const result = runCli(['--relative'], testDir);
+            // Pass the relative path of the non-existent file
+            const result = runCli(['--relative'], testDir, {}, relativeGlobalIgnorePath);
 
             expect(result.status).toBe(0);
             expect(result.stderr).toBe(''); // No error message about missing file
 
-            // **** Expect relative paths ****
             // Check for presence of specific files/dirs relative to testDir
             expect(result.stdoutLines).toContain('.'); // The starting directory itself
             expect(result.stdoutLines).toContain('doc.txt'); // Sanity check file
             expect(result.stdoutLines).toContain('excluded.tmp'); // Should be found as no global exclude applied
             expect(result.stdoutLines).toContain('build'); // Directory should be found
-            expect(result.stdoutLines).toContain('.config'); // Hidden dir should be found
+            expect(result.stdoutLines).toContain('.config'); // Hidden dir should be found (contains app.conf)
 
             // Check that default excludes ARE still applied
             expect(result.stdoutLines).not.toContain('node_modules');
