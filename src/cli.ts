@@ -131,9 +131,10 @@ class PhindApp {
             const maxDepth = argv.maxdepth as number;
 
             // Assume PhindConfig has a method `getDefaultExcludes()` returning string[]
-            // based on the logic in Attempt 5 of traverser.ts
-            const defaultExcludes = (this.config as any).getDefaultExcludes ?
-                (this.config as any).getDefaultExcludes() : ['node_modules', '.git']; // Fallback if method doesn't exist yet
+            // This assumes the PhindConfig class *has* a method to get the raw defaults.
+            // If not, hardcode them here based on the config's internal value.
+            const defaultExcludes = (this.config as any).hardcodedDefaultExcludes || ['node_modules', '.git'];
+            // const defaultExcludes = ['node_modules', '.git']; // Or just hardcode if method access is problematic
 
             const traverseOptions: TraverseOptions = {
                 // Get the combined list of excludes from config
@@ -145,7 +146,7 @@ class PhindApp {
                 maxDepth: maxDepth,
                 ignoreCase: argv.ignoreCase as boolean,
                 relativePaths: argv.relative as boolean,
-                // Pass default excludes separately for override logic (needed by Attempt 5)
+                // Pass default excludes separately for override logic
                 defaultExcludes: defaultExcludes,
             };
 

@@ -4,133 +4,161 @@ import path from 'path';
 import micromatch from 'micromatch';
 import type { Dirent } from 'fs';
 
-// Define an interface for the options for better type safety
+// Options interface remains the same from Attempt 5
 export interface TraverseOptions {
-    excludePatterns: string[]; // This should be the *effective* list (default+global+cli)
+    excludePatterns: string[]; // Combined effective list
     includePatterns: string[];
     matchType: 'f' | 'd' | null;
     maxDepth: number;
     ignoreCase: boolean;
     relativePaths: boolean;
-    // Add default excludes separately for override logic
-    defaultExcludes: string[]; // Pass the hardcoded defaults here
+    defaultExcludes: string[]; // The hardcoded defaults
 }
 
 interface InternalMicromatchOptions {
     nocase: boolean;
     dot: boolean;
+    // `matchBase` might be useful for patterns without slashes like 'node_modules'
+    // but let's rely on testing name, relative, and absolute paths explicitly.
 }
 
 export class DirectoryTraverser {
     private options: TraverseOptions;
     private basePath: string;
     private baseMicromatchOptions: InternalMicromatchOptions;
-    // Store default excludes separately
-    private defaultExcludes: string[];
+    private defaultExcludes: Set<string>; // Use a Set for quick lookup
+    private nonDefaultIncludePatterns: string[]; // Includes other than '*'
 
     constructor(options: TraverseOptions, basePath: string) {
         this.options = options;
         this.basePath = path.resolve(basePath);
         this.baseMicromatchOptions = {
             nocase: this.options.ignoreCase,
-            dot: true
+            dot: true // Essential for matching '.git' etc.
         };
-        // Store the defaults passed via options
-        this.defaultExcludes = options.defaultExcludes;
-        // console.log("Traverser Initialized With:", { options: JSON.stringify(this.options), basePath: this.basePath });
+        this.defaultExcludes = new Set(options.defaultExcludes);
+
+        // Pre-calculate include patterns that are not the default '*'
+        this.nonDefaultIncludePatterns = options.includePatterns.filter(p => p !== '*');
     }
 
-     /**
-      * Checks if a given item matches patterns.
-      * For directory includes, also checks patterns like 'dir/**'.
-      */
-     private isMatch(
-         name: string,
-         fullPath: string,
-         relativePath: string,
-         patterns: string[],
-         isDirContext: boolean, // Is this check for a directory?
-         isIncludeCheck: boolean // Is this checking includePatterns?
-     ): boolean {
-         if (!patterns || patterns.length === 0) {
-             return false; // No patterns, no match
-         }
+    /**
+     * Simple check if an item matches any pattern in a list.
+     */
+    private matchesAnyPattern(
+        name: string,
+        fullPath: string,
+        relativePath: string,
+        patterns: string[]
+    ): boolean {
+        if (!patterns || patterns.length === 0) {
+            return false;
+        }
+        const absPathNormalized = path.normalize(fullPath).replace(/\\/g, '/');
+        const relPathNormalized = relativePath === '.' ? '.' : path.normalize(relativePath).replace(/\\/g, '/');
+        const testPaths = [name, absPathNormalized];
+        if (this.options.relativePaths && relPathNormalized) {
+            testPaths.push(relPathNormalized);
+        }
+        return micromatch.some(testPaths, patterns, this.baseMicromatchOptions);
+    }
 
-         const absPathNormalized = path.normalize(fullPath).replace(/\\/g, '/');
-         const relPathNormalized = relativePath === '.' ? '.' : path.normalize(relativePath).replace(/\\/g, '/');
+    /**
+     * Checks if a directory should be pruned.
+     * Prune if excluded UNLESS explicitly included by a non-'*' pattern.
+     */
+    private shouldPrune(
+        name: string,
+        fullPath: string,
+        relativePath: string
+    ): boolean {
+        const isExcluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns);
+        if (!isExcluded) {
+            return false; // Not excluded, don't prune
+        }
 
-         const testPaths = [
-             name, // Match base name 'node_modules'
-             absPathNormalized, // Match full path '/path/to/node_modules'
-             // Only test relative path if option enabled AND path exists
-             (this.options.relativePaths && relPathNormalized) ? relPathNormalized : undefined
-         ].filter(p => typeof p === 'string') as string[];
+        // It's excluded, check if an *explicit* include pattern saves it
+        // We use `nonDefaultIncludePatterns` to avoid '*' preventing pruning.
+        // We also need to check patterns like dir/** or dir/ matching dir
+        const explicitIncludePatterns = this.nonDefaultIncludePatterns.map(p => {
+            if (p.endsWith('/**')) return p.substring(0, p.length - 3);
+            if (p.endsWith('/')) return p.substring(0, p.length - 1);
+            return p; // Keep the original explicit pattern too
+        });
+        // Add the original non-default patterns back in case they were simple names like '.git'
+        explicitIncludePatterns.push(...this.nonDefaultIncludePatterns);
+        const uniqueExplicitIncludes = [...new Set(explicitIncludePatterns)];
 
-         // Create options instance for this specific check (nocase might differ)
-         const currentMicromatchOptions: InternalMicromatchOptions = {
-             nocase: this.options.ignoreCase,
-             dot: true
-         };
 
-         // console.log(`isMatch Internal: Testing ${JSON.stringify(testPaths)} against ${JSON.stringify(patterns)}`);
+        const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, uniqueExplicitIncludes);
 
-         if (micromatch.some(testPaths, patterns, currentMicromatchOptions)) {
-             // console.log(`  -> Standard match SUCCESS`);
-             return true;
-         }
+        // Prune if excluded AND NOT explicitly included by a non-'*' pattern
+        return isExcluded && !isExplicitlyIncluded;
+    }
 
-         // Special check for directory includes like 'node_modules/**' matching 'node_modules'
-         // If checking includes for a directory, see if patterns like 'dir/**' or 'dir/' match 'dir'
-         if (isDirContext && isIncludeCheck) {
-             const dirMatchPatterns = patterns
-                 .map(p => {
-                     // Convert 'dir/**' to 'dir' for matching the directory itself
-                     if (p.endsWith('/**')) return p.substring(0, p.length - 3);
-                     // Convert 'dir/' to 'dir'
-                     if (p.endsWith('/')) return p.substring(0, p.length - 1);
-                     return null; // Don't derive other patterns
-                 })
-                 .filter(p => p !== null) as string[]; // Filter out non-derived patterns
+    /**
+     * Checks if an item should be printed based on all filters.
+     */
+    private shouldPrintItem(
+        name: string,
+        fullPath: string,
+        relativePath: string,
+        isDirectory: boolean,
+        isFile: boolean
+    ): boolean {
+        // 1. Type Check
+        const { matchType } = this.options;
+        if (matchType) {
+            if (matchType === 'f' && !isFile) return false;
+            if (matchType === 'd' && !isDirectory) return false;
+        }
 
-             if (dirMatchPatterns.length > 0 && micromatch.some(testPaths, dirMatchPatterns, currentMicromatchOptions)) {
-                 // console.log(`  -> Directory include match SUCCESS on derived patterns: ${dirMatchPatterns.join(',')}`);
-                 return true;
-             }
-         }
+        // 2. Include Check
+        const isIncluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.includePatterns);
+        if (!isIncluded) {
+            return false; // Must be included
+        }
 
-         return false;
-     }
+        // 3. Exclude Check (with override logic)
+        const isExcluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns);
+        if (!isExcluded) {
+            return true; // Included and not excluded - PRINT
+        }
 
+        // --- It IS excluded, check if it's ONLY by default AND was included explicitly ---
+        const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludes));
+
+        if (isExcludedByDefault) {
+            // Check if an explicit (non-'*') include pattern matches
+            const explicitIncludePatterns = this.nonDefaultIncludePatterns.map(p => {
+                if (p.endsWith('/**')) return p.substring(0, p.length - 3);
+                if (p.endsWith('/')) return p.substring(0, p.length - 1);
+                return p;
+            });
+            explicitIncludePatterns.push(...this.nonDefaultIncludePatterns);
+            const uniqueExplicitIncludes = [...new Set(explicitIncludePatterns)];
+
+            const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, uniqueExplicitIncludes);
+
+            if (isExplicitlyIncluded) {
+                 // console.log(`Printing ${name} despite default exclude due to explicit include override.`);
+                 return true; // Excluded only by default, but explicitly included - PRINT (Override works)
+            }
+        }
+
+        // --- If we reach here: It's excluded, and either not by default, or not explicitly included to override ---
+        return false; // Excluded - DO NOT PRINT
+    }
 
     public async traverse(dirPath: string, currentDepth: number = 0): Promise<void> {
-        const {
-            excludePatterns, // Effective excludes (default+global+cli)
-            includePatterns,
-            matchType,
-            maxDepth,
-            relativePaths
-        } = this.options;
+        const { maxDepth, relativePaths } = this.options;
 
         // --- 1. Handle Starting Directory (Depth 0) ---
         if (currentDepth === 0) {
-            const isDirTypeMatch = !matchType || matchType === 'd';
             const dirName = path.basename(dirPath);
             const relativePathForMatch = relativePaths ? '.' : '';
             const displayPath = relativePaths ? '.' : dirPath;
-
-            const isIncluded = this.isMatch(dirName, dirPath, relativePathForMatch, includePatterns, true, true);
-            // Check against effective excludes first
-            const isExcluded = this.isMatch(dirName, dirPath, relativePathForMatch, excludePatterns, true, false);
-             // Separately check if excluded by a default pattern
-            const isExcludedByDefault = this.isMatch(dirName, dirPath, relativePathForMatch, this.defaultExcludes, true, false);
-
-            // Print if (Included AND NOT Excluded) OR (Included AND Excluded *only* by Default)
-            const shouldPrint = isIncluded && (!isExcluded || (isExcluded && isExcludedByDefault));
-
-             // console.log(`Start Dir: Display=${displayPath} Included=${isIncluded}, Excluded=${isExcluded}, ExcludedByDefault=${isExcludedByDefault}, TypeMatch=${isDirTypeMatch} -> ShouldPrint=${shouldPrint}`);
-
-            if (isDirTypeMatch && shouldPrint) {
-                 // console.log(`  Printing Start Dir: ${displayPath}`);
+            if (this.shouldPrintItem(dirName, dirPath, relativePathForMatch, true, false)) {
                  console.log(displayPath);
             }
         }
@@ -141,7 +169,7 @@ export class DirectoryTraverser {
         // --- 3. Read Directory Entries ---
         let entries: Dirent[];
         try { entries = await fs.readdir(dirPath, { withFileTypes: true }); }
-        catch (err: any) { return; } // Fail silently on errors
+        catch (err: any) { return; } // Fail silently
 
         // --- 4. Process Entries ---
         for (const dirent of entries) {
@@ -152,59 +180,22 @@ export class DirectoryTraverser {
             const isDirectory = dirent.isDirectory();
             const isFile = dirent.isFile();
 
-            // --- 4a. Pruning Check (Includes override Excludes for Pruning) ---
-            if (isDirectory) {
-                // Check if it matches an exclude pattern
-                const isPotentiallyExcluded = this.isMatch(entryName, entryFullPath, entryRelativePath, excludePatterns, true, false);
+            // --- 4a. Pruning Check ---
+            if (isDirectory && this.shouldPrune(entryName, entryFullPath, entryRelativePath)) {
+                 // console.log(`Pruning: ${displayPath}`);
+                 continue;
+            }
 
-                if (isPotentiallyExcluded) {
-                    // If excluded, check if it's ALSO explicitly included
-                     const isExplicitlyIncluded = this.isMatch(entryName, entryFullPath, entryRelativePath, includePatterns, true, true);
-                     if (!isExplicitlyIncluded) {
-                        // console.log(`  Pruning directory: ${displayPath} (Excluded and not explicitly included)`);
-                        continue; // PRUNE: It's excluded and NOT explicitly included
-                     } else {
-                         // console.log(`  Directory not pruned: ${displayPath} (Excluded but also explicitly included)`);
-                     }
+            // --- 4b. Filtering & Printing ---
+            // Check depth of the *item* itself
+            if (currentDepth + 1 <= maxDepth) {
+                if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
+                    console.log(displayPath);
                 }
             }
-            // --- End Pruning Check ---
 
-
-            // --- 4b. Filtering Logic (for items NOT pruned) ---
-            let typeMatches = true; // Type Check
-            if (matchType) {
-                if (matchType === 'f' && !isFile) typeMatches = false;
-                if (matchType === 'd' && !isDirectory) typeMatches = false;
-            }
-
-            // Check inclusion
-            const isIncluded = this.isMatch(entryName, entryFullPath, entryRelativePath, includePatterns, isDirectory, true);
-
-            // Check exclusion (against all effective excludes)
-            const isExcluded = this.isMatch(entryName, entryFullPath, entryRelativePath, excludePatterns, isDirectory, false);
-
-            // Check if exclusion is specifically due to a default pattern
-            const isExcludedByDefault = this.isMatch(entryName, entryFullPath, entryRelativePath, this.defaultExcludes, isDirectory, false);
-
-            // Determine if the item should be printed based on the logic:
-            // Print if:
-            // 1. Type matches AND
-            // 2. It's included AND
-            // 3. (It's NOT excluded OR (it IS excluded BUT only by a default pattern, thus overridden by include))
-            const shouldPrint = typeMatches && isIncluded && (!isExcluded || (isExcluded && isExcludedByDefault));
-
-            // console.log(`Filter Check: Entry=${displayPath} Included=${isIncluded}, Excluded=${isExcluded}, ExcludedByDefault=${isExcludedByDefault}, TypeMatch=${typeMatches} -> ShouldPrint=${shouldPrint}`);
-
-
-            // --- 4c. Print ---
-            if (currentDepth + 1 <= maxDepth && shouldPrint) {
-                 // console.log(`  Printing Entry: ${displayPath}`);
-                 console.log(displayPath);
-            }
-
-            // --- 4d. Recurse ---
-            if (isDirectory) { // Recurse if it's a directory (pruned directories were skipped)
+            // --- 4c. Recurse ---
+            if (isDirectory) {
                 await this.traverse(entryFullPath, currentDepth + 1);
             }
         }

@@ -142,9 +142,10 @@ class PhindApp {
                 // MAX_SAFE_INTEGER is handled by yargs coerce now
                 const maxDepth = argv.maxdepth;
                 // Assume PhindConfig has a method `getDefaultExcludes()` returning string[]
-                // based on the logic in Attempt 5 of traverser.ts
-                const defaultExcludes = this.config.getDefaultExcludes ?
-                    this.config.getDefaultExcludes() : ['node_modules', '.git']; // Fallback if method doesn't exist yet
+                // This assumes the PhindConfig class *has* a method to get the raw defaults.
+                // If not, hardcode them here based on the config's internal value.
+                const defaultExcludes = this.config.hardcodedDefaultExcludes || ['node_modules', '.git'];
+                // const defaultExcludes = ['node_modules', '.git']; // Or just hardcode if method access is problematic
                 const traverseOptions = {
                     // Get the combined list of excludes from config
                     excludePatterns: this.config.getEffectiveExcludePatterns(),
@@ -155,7 +156,7 @@ class PhindApp {
                     maxDepth: maxDepth,
                     ignoreCase: argv.ignoreCase,
                     relativePaths: argv.relative,
-                    // Pass default excludes separately for override logic (needed by Attempt 5)
+                    // Pass default excludes separately for override logic
                     defaultExcludes: defaultExcludes,
                 };
                 // Create and run the traverser, passing the resolved basePath
