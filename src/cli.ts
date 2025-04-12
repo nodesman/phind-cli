@@ -122,11 +122,10 @@ class PhindApp {
                 maxDepth: maxDepth,
                 ignoreCase: argv.ignoreCase as boolean,
                 relativePaths: argv.relative as boolean,
-                basePath: basePath
             };
 
             // Create and run the traverser
-            const traverser = new DirectoryTraverser(traverseOptions);
+            const traverser = new DirectoryTraverser(traverseOptions, basePath);
             await traverser.traverse(startPath); // Start traversal
 
         } catch (error: any) {

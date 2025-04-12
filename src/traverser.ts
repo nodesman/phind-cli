@@ -13,7 +13,6 @@ export interface TraverseOptions {
     maxDepth: number;
     ignoreCase: boolean;
     relativePaths: boolean;
-    basePath: string;
 }
 
 interface MicromatchOptions {
@@ -23,10 +22,12 @@ interface MicromatchOptions {
 
 export class DirectoryTraverser {
     private options: TraverseOptions;
+    private basePath: string;
     private micromatchOptions: MicromatchOptions;
 
-    constructor(options: TraverseOptions) {
+    constructor(options: TraverseOptions, basePath: string) {
         this.options = options;
+        this.basePath = basePath;
         this.micromatchOptions = {
             nocase: this.options.ignoreCase,
             dot: true // Always match dotfiles unless explicitly excluded
@@ -40,7 +41,7 @@ export class DirectoryTraverser {
             matchType,
             maxDepth,
             relativePaths,
-            basePath
+            // basePath
         } = this.options;
 
         if (currentDepth > maxDepth) {
@@ -61,7 +62,7 @@ export class DirectoryTraverser {
 
         for (const dirent of entries) {
             const entryPath = path.join(dirPath, dirent.name);
-            const displayPath = relativePaths ? path.relative(basePath, entryPath) || '.' : entryPath;
+            const displayPath = relativePaths ? path.relative(this.basePath, entryPath) || '.' : entryPath;
 
             const isDirectory = dirent.isDirectory();
             const isFile = dirent.isFile();

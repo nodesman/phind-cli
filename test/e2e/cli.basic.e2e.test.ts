@@ -132,6 +132,9 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
 
         it('should handle ".." to navigate up', async () => {
             const parentDir = path.dirname(testDir);
+                        // create test file to avoid directory listing
+
+            await fs.writeFile(path.join(parentDir, "test.txt"), "temp file");
             const result = runCli(['..'], path.dirname(testDir));
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');

@@ -107,10 +107,9 @@ export const runTraverse = async (
         maxDepth: Number.MAX_SAFE_INTEGER,
         ignoreCase: false,
         relativePaths: false, // Default to absolute for base runner
-        basePath: testDir,
         ...options,
     };
-    const traverser = new DirectoryTraverser(defaultOptions);
+    const traverser = new DirectoryTraverser(defaultOptions, testDir);
     await traverser.traverse(testDir);
 
     return normalizeAndSort(consoleLogSpy.mock.calls, defaultOptions.relativePaths);
