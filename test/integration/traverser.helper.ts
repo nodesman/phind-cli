@@ -26,7 +26,8 @@ export const testStructure = {
     },
     'dir2': {
         'file5.log': 'content5',
-        'image.JPG': 'uppercase jpg'
+        'image.JPG': 'uppercase jpg',
+        'image.jpg': 'lowercase jpg' // <-- ADD THIS LINE
     },
     '.git': { 'config': 'git config', 'HEAD': 'ref: refs/heads/main' },
     'node_modules': { 'some_package': { 'index.js': 'code' } },

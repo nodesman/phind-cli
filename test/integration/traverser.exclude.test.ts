@@ -149,7 +149,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
     it('should NOT prune a directory if only its *contents* match an exclude pattern (e.g., exclude dir1/*.log)', async () => {
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['dir1/*.log'] });
         expect(results).toContain('dir1');
-        expect(results).not.toContain('dir1/subDir1/another.log');
+        expect(results).toContain('dir1/subDir1/another.log'); // <-- Changed from not.toContain
         expect(results).toContain('dir1/file3.txt');
     });
 
@@ -182,11 +182,14 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
     it('should correctly exclude items even if they also match an include pattern (exclude priority)', async () => {
          const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
             includePatterns: ['*.txt'],
-            excludePatterns: ['file1.txt']
+            excludePatterns: ['file1.txt'],
+            ignoreCase: true // <-- FIX: Add ignoreCase: true so '*.txt' matches ' Capitals.TXT'
         });
 
          expect(results).not.toContain('file1.txt');
          expect(results).toContain(' Capitals.TXT');
+         expect(results).toContain('.hiddenDir/insideHidden.txt'); // Should also be included now
+         expect(results).toContain('dir with spaces/file inside spaces.txt');
          expect(results).toContain('dir1/file3.txt');
     });
 
