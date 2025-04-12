@@ -1,6 +1,8 @@
 // test/integration/traverser.depth.test.ts
 import path from 'path';
 import fs from 'fs-extra'; // Import fs-extra for mocking readdir
+// --- FIX: Import promises API specifically for mocking ---
+import fsPromises from 'fs/promises';
 import { setupTestEnvironment, cleanupTestEnvironment, runTraverse, runTraverseRelative, testStructure } from './traverser.helper'; // Import testStructure
 
 describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
@@ -13,6 +15,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
 
     afterEach(async () => {
         await cleanupTestEnvironment(testDir, spies);
+        jest.restoreAllMocks(); // Ensure mocks are restored after each test
     });
 
     it('should find only the starting item when maxDepth=0 (absolute)', async () => {
@@ -81,6 +84,9 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             path.join(testDir, 'dir with spaces', 'file inside spaces.txt'),
             path.join(testDir, 'dir1'),
             path.join(testDir, 'dir2'),
+            path.join(testDir, 'dir2', 'file5.log'),
+            path.join(testDir, 'dir2', 'image.JPG'),
+            path.join(testDir, 'dir2', 'image.jpg'),
             path.join(testDir, 'emptyDir'),
             path.join(testDir, 'file1.txt'),
             path.join(testDir, 'file2.log'),
@@ -92,10 +98,6 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             path.join(testDir, 'dir1', 'file3.txt'),
             path.join(testDir, 'dir1', 'file6.data'),
             path.join(testDir, 'dir1', 'subDir1'),
-            // Contents of dir2 are at depth 2
-            path.join(testDir, 'dir2', 'file5.log'),
-            path.join(testDir, 'dir2', 'image.JPG'),
-            path.join(testDir, 'dir2', 'image.jpg'),
             testDir // Base dir itself
         ].sort();
 
@@ -118,6 +120,9 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             'dir with spaces/file inside spaces.txt',
             'dir1',
             'dir2',
+            'dir2/file5.log',
+            'dir2/image.JPG',
+            'dir2/image.jpg',
             'emptyDir',
             'file1.txt',
             'file2.log',
@@ -129,10 +134,6 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             'dir1/file3.txt',
             'dir1/file6.data',
             'dir1/subDir1',
-            // Contents of dir2 are at depth 2
-            'dir2/file5.log',
-            'dir2/image.JPG',
-            'dir2/image.jpg',
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: 2 });
         expect(results).toEqual(expected);
@@ -166,21 +167,26 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
 
     it('should stop recursing into directories when currentDepth equals maxDepth', async () => {
         // This test tries to verify that readdir isn't called unnecessarily deep.
-        const originalReaddir = fs.readdir; // Use the actual fs.readdir
-        const readdirMock = jest.spyOn(fs, 'readdir');
+        // --- FIX: Get the actual fs.promises.readdir function ---
+        const originalReaddir = fsPromises.readdir;
+        // --- FIX: Spy on the promises version of readdir ---
+        const readdirMock = jest.spyOn(fsPromises, 'readdir');
 
         // Mock implementation - Check path depth relative to testDir
-        readdirMock.mockImplementation(async (dirPath: fs.PathLike, options?: any): Promise<string[] | Buffer[] | fs.Dirent[]> => {
-            const relativePath = path.relative(testDir, dirPath.toString());
+        // --- FIX: Update mock signature to match fs.promises.readdir ---
+        readdirMock.mockImplementation(async (dirPath: fs.PathLike, options?: BufferEncoding | { encoding?: BufferEncoding | null, withFileTypes?: boolean } | null): Promise<string[] | Buffer[] | fs.Dirent[]> => {
+            const currentPathStr = dirPath.toString(); // Ensure string for path operations
+            const relativePath = path.relative(testDir, currentPathStr);
             const depth = relativePath === '' ? 0 : relativePath.split(path.sep).length;
 
             // If depth is 2 (meaning we are *inside* a depth 1 directory like dir1),
             // readdir should NOT be called if maxDepth is 1.
             if (depth >= 2) { // >= maxDepth + 1
-                throw new Error(`readdir called on directory too deep: ${dirPath} (depth ${depth}) with maxDepth 1`);
+                throw new Error(`readdir called on directory too deep: ${currentPathStr} (depth ${depth}) with maxDepth 1`);
             }
             // Allow calls for depth 0 and 1
-            return originalReaddir(dirPath, options); // Call the original function
+            // --- FIX: Call the original *promise* version ---
+            return originalReaddir(dirPath, options);
         });
 
         // Run the traversal with maxDepth 1
@@ -189,12 +195,14 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             .not.toThrow();
 
         // Verify readdir was called on the root and potentially depth 1 dirs
-        expect(readdirMock).toHaveBeenCalledWith(expect.stringContaining(testDir), expect.anything()); // Called on root
-        expect(readdirMock).toHaveBeenCalledWith(expect.stringContaining(path.join(testDir, 'dir1')), expect.anything()); // May be called on depth 1 dirs
+        // --- FIX: Use testDir directly, as it's resolved in setupTestEnvironment ---
+        expect(readdirMock).toHaveBeenCalledWith(testDir, expect.anything()); // Called on root
+        expect(readdirMock).toHaveBeenCalledWith(path.join(testDir, 'dir1'), expect.anything()); // May be called on depth 1 dirs like dir1
 
         // Check it wasn't called on a depth 2 directory
-        expect(readdirMock).not.toHaveBeenCalledWith(expect.stringContaining(path.join(testDir, 'dir1', 'subDir1')), expect.anything());
+        expect(readdirMock).not.toHaveBeenCalledWith(path.join(testDir, 'dir1', 'subDir1'), expect.anything());
 
-        readdirMock.mockRestore(); // Clean up the mock
+        // --- No need to call mockRestore here if using jest.restoreAllMocks() in afterEach ---
+        // readdirMock.mockRestore();
     });
 });

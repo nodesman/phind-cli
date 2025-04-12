@@ -72,13 +72,19 @@ describe('CLI E2E - Argument Validation and Error Handling', () => {
         await fs.ensureDir(readableDir);
         await fs.writeFile(readableFile, 'can read this');
 
-        let chmodError = null;
+        let chmodError: Error | null = null; // Explicitly type chmodError
         try {
             // Attempt to make it unreadable (might fail on some systems/permissions)
             await fs.chmod(unreadableDir, 0o000); // No read/write/execute
         } catch (err) {
-            chmodError = err;
-            console.warn(`Could not set permissions for unreadable_dir in test: ${err.message}. Test may not be reliable.`);
+             // --- FIX: Check if err is an Error ---
+             if (err instanceof Error) {
+                 chmodError = err;
+                 console.warn(`Could not set permissions for unreadable_dir in test: ${err.message}. Test may not be reliable.`);
+             } else {
+                 chmodError = new Error(String(err)); // Wrap non-error types
+                 console.warn(`Could not set permissions for unreadable_dir in test (non-Error type): ${String(err)}. Test may not be reliable.`);
+             }
         }
 
         const result = runCli([testDir], testDir); // Run on the parent directory
@@ -88,7 +94,12 @@ describe('CLI E2E - Argument Validation and Error Handling', () => {
             try {
                 await fs.chmod(unreadableDir, 0o777);
             } catch (err) {
-                 console.warn(`Could not restore permissions for unreadable_dir: ${err.message}`);
+                 // --- FIX: Check if err is an Error ---
+                 if (err instanceof Error) {
+                     console.warn(`Could not restore permissions for unreadable_dir: ${err.message}`);
+                 } else {
+                     console.warn(`Could not restore permissions for unreadable_dir (non-Error type): ${String(err)}`);
+                 }
             }
         }
 
