@@ -34,41 +34,32 @@ export const runCli = (
     args: string[],
     cwd: string,
     env?: NodeJS.ProcessEnv,
-    globalIgnorePath?: string | null // Add optional parameter
+    globalIgnorePath?: string | null
 ): CliResult => {
-    const cliPath = path.resolve(__dirname, '../../bin/cli.js'); // Adjust path to compiled cli.js
+    const cliPath = path.resolve(__dirname, '../../bin/cli.js');
 
-    // Create a mutable copy of the environment to modify
-    const processEnv = { ...process.env, ...env }; // Merge base env and specific test env
+    const processEnv = { ...process.env, ...env };
 
-    // --- START MODIFICATION ---
-    // Check if the --no-global-ignore flag is present in the arguments
     const noGlobalIgnoreFlag = args.includes('--no-global-ignore');
 
     if (noGlobalIgnoreFlag) {
-        // If the flag is present, ensure the environment variable is *unset*
-        // This overrides any path passed via the globalIgnorePath parameter for this specific test run.
-        delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
+        // Explicitly set to undefined for robust unsetting
+        processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
     } else {
-        // Otherwise (flag is NOT present), set/unset the env var based on the parameter as before
         if (globalIgnorePath === null) {
              // Explicitly unset if null is passed
-             delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
+             processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
         } else if (globalIgnorePath) {
-             // Pass the absolute path to the test's global ignore file
-             // Resolve it relative to the cwd (testDir) where the command is run
              processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = path.resolve(cwd, globalIgnorePath);
         } else {
-            // If globalIgnorePath is undefined (not passed), clear any potential leftover
-             delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
+             processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
         }
     }
-    // --- END MODIFICATION ---
 
     const result = spawn.sync(process.execPath, [cliPath, ...args], {
         cwd,
         encoding: 'utf-8',
-        env: processEnv, // Use the modified environment
+        env: processEnv,
     });
 
     const normalizeOutput = (output: string | null): string => (output || '').replace(/\r\n/g, '\n');
