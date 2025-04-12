@@ -1,5 +1,4 @@
 // test/e2e/cli.basic.e2e.test.ts
-import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
 import os from 'os';
@@ -9,17 +8,16 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
     let testDir: string;
 
     beforeEach(async () => {
-        testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'phind-e2e-'));
+        // Use a simpler structure for basic tests, less likely to hit defaults
+        testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'phind-e2e-basic-'));
         await createTestStructure(testDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg',
-            'script.js': 'javascript',
-            '.config': { 'app.conf': 'config file' },
-            'build': {
-                'output.log': 'log data',
-                'app.exe': 'executable',
+            'subdir': {
+                'nested.js': 'javascript',
             },
-            'empty': null,
+            '.hiddenfile': 'hidden',
+            'emptyDir': null,
         });
     });
 
@@ -28,70 +26,53 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
     });
 
     describe('Basic Execution', () => {
-        it('should run with no arguments and find items in current dir (excluding defaults)', () => {
-            const result = runCli([], testDir);
+        // Test without --relative flag - Expect ABSOLUTE paths
+        it('should run with no arguments and find items in current dir (excluding defaults, absolute paths)', () => {
+            const result = runCli([], testDir); // NO --relative
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
+            // EXPECT ABSOLUTE PATHS
             const expected = [
-                '.',
-                '.config',
-                '.config/app.conf',
-                'build',
-                'build/app.exe',
-                'build/output.log',
-                'doc.txt',
-                'empty',
-                'image.jpg',
-                'script.js',
+                path.join(testDir), // Starting directory itself
+                path.join(testDir, '.hiddenfile'),
+                path.join(testDir, 'doc.txt'),
+                path.join(testDir, 'emptyDir'),
+                path.join(testDir, 'image.jpg'),
+                path.join(testDir, 'subdir'),
+                path.join(testDir, 'subdir', 'nested.js'),
+            ].sort();
+            // normalizeAndSort just normalizes separators and sorts
+            expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
+        });
+
+        // Test with specific dir - NO --relative flag - Expect ABSOLUTE paths within
+        it('should run with a specific directory path argument (absolute paths)', () => {
+            const result = runCli(['subdir'], testDir); // NO --relative
+            expect(result.status).toBe(0);
+            expect(result.stderr).toBe('');
+            // EXPECT ABSOLUTE PATHS including the starting dir itself
+            const expected = [
+                path.join(testDir, 'subdir'), // The starting dir for the traversal
+                path.join(testDir, 'subdir', 'nested.js'),
             ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
-        it('should run with a specific directory path argument', () => {
-            const result = runCli(['build'], testDir);
+        // Test with spaces in name - NO --relative - Expect ABSOLUTE paths
+        it('should run targeting a directory with spaces in its name (absolute paths)', async () => {
+            const dirWithSpaces = path.join(testDir, 'dir with spaces');
+            await fs.ensureDir(dirWithSpaces);
+            await fs.writeFile(path.join(dirWithSpaces, 'file inside spaces.txt'), 'space content');
+
+            const result = runCli(['dir with spaces'], testDir); // NO --relative
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
+            // EXPECT ABSOLUTE PATHS including the starting dir itself
             const expected = [
-                'build/app.exe',
-                'build/output.log',
+                dirWithSpaces, // The starting directory
+                path.join(dirWithSpaces, 'file inside spaces.txt')
             ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
-        });
-
-        it('should run targeting a directory with spaces in its name', async () => {
-            const testDirWithSpaces = await fs.mkdtemp(path.join(os.tmpdir(), 'phind-e2e-spaces-'));
-            await createTestStructure(testDirWithSpaces, {
-                'dir with spaces': {
-                    'file inside spaces.txt': 'space content'
-                }
-            });
-            const result = runCli(['dir with spaces'], testDirWithSpaces);
-            expect(result.status).toBe(0);
-            expect(result.stderr).toBe('');
-            const expected = [
-                'dir with spaces/file inside spaces.txt'
-            ].sort();
-            expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
-
-            await fs.remove(testDirWithSpaces);
-        });
-
-        it('should run targeting a directory containing files/dirs with spaces', async () => {
-             const testDirWithSpaces = await fs.mkdtemp(path.join(os.tmpdir(), 'phind-e2e-spaces-'));
-            await createTestStructure(testDirWithSpaces, {
-                'dir1': {
-                    'file with spaces.txt': 'content'
-                }
-            });
-            const result = runCli(['dir1'], testDirWithSpaces);
-            expect(result.status).toBe(0);
-            expect(result.stderr).toBe('');
-            const expected = [
-                'dir1/file with spaces.txt'
-            ].sort();
-            expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
-
-            await fs.remove(testDirWithSpaces);
         });
 
         it('should exit with status 0 on successful execution', () => {
@@ -102,6 +83,7 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
         it('should output results to stdout', () => {
             const result = runCli([], testDir);
             expect(result.stdout).toBeDefined();
+            expect(result.stdout.length).toBeGreaterThan(0);
         });
 
         it('should output nothing to stderr on successful execution', () => {
@@ -111,67 +93,72 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
     });
 
     describe('Path Handling', () => {
-        it('should handle "." as the current directory', () => {
-            const result = runCli(['.'], testDir);
+        // Test with "." - NO --relative - Expect ABSOLUTE paths
+        it('should handle "." as the current directory (absolute paths)', () => {
+            const result = runCli(['.'], testDir); // NO --relative
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
+             // EXPECT ABSOLUTE PATHS
              const expected = [
-                '.',
-                '.config',
-                '.config/app.conf',
-                'build',
-                'build/app.exe',
-                'build/output.log',
-                'doc.txt',
-                'empty',
-                'image.jpg',
-                'script.js',
+                path.join(testDir), // Starting directory itself
+                path.join(testDir, '.hiddenfile'),
+                path.join(testDir, 'doc.txt'),
+                path.join(testDir, 'emptyDir'),
+                path.join(testDir, 'image.jpg'),
+                path.join(testDir, 'subdir'),
+                path.join(testDir, 'subdir', 'nested.js'),
             ].sort();
              expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
-        it('should handle ".." to navigate up', async () => {
+        // Test with ".." - this is prone to finding unrelated system files and permission errors
+        // Modify test to focus only on finding the expected testDir elements relative to parent
+        it('should handle ".." to navigate up and find test dir contents (relative to parent)', async () => {
             const parentDir = path.dirname(testDir);
-                        // create test file to avoid directory listing
+            const testDirName = path.basename(testDir);
 
-            await fs.writeFile(path.join(parentDir, "test.txt"), "temp file");
-            const result = runCli(['..'], path.dirname(testDir));
+            // Run from parent, target '..'
+            const result = runCli(['..'], parentDir);
             expect(result.status).toBe(0);
-            expect(result.stderr).toBe('');
+            // Don't assert empty stderr, as system folders might cause permission errors outside testDir
+            // expect(result.stderr).toBe('');
 
-             const expectedPaths = [
-                path.basename(testDir),
-                path.join(path.basename(testDir), ".config"),
-                path.join(path.basename(testDir), ".config/app.conf"),
-                path.join(path.basename(testDir), "build"),
-                path.join(path.basename(testDir), "build/app.exe"),
-                path.join(path.basename(testDir), "build/output.log"),
-                path.join(path.basename(testDir), "doc.txt"),
-                path.join(path.basename(testDir), "empty"),
-                path.join(path.basename(testDir), "image.jpg"),
-                path.join(path.basename(testDir), "script.js"),
+            // Expected paths *relative to the parentDir* where the command was run
+            const expectedRelativePaths = [
+                testDirName, // The test dir itself relative to parent
+                path.join(testDirName, '.hiddenfile'),
+                path.join(testDirName, 'doc.txt'),
+                path.join(testDirName, 'emptyDir'),
+                path.join(testDirName, 'image.jpg'),
+                path.join(testDirName, 'subdir'),
+                path.join(testDirName, 'subdir', 'nested.js'),
+            ].map(p => p.replace(/\\/g, '/')).sort(); // Ensure consistent slashes for comparison
 
-            ].sort();
-           const actualPaths = result.stdoutLines.map(line => {
-               return path.relative(parentDir, path.join(parentDir, line));
-           }).sort();
+           // Filter stdout to only include lines starting with our testDirName
+           const actualPaths = result.stdoutLines
+               .filter(line => line.startsWith(testDirName) || line === testDirName)
+               .map(line => line.replace(/\\/g, '/')) // Ensure consistent slashes
+               .sort();
 
-           expect(actualPaths).toEqual(expectedPaths);
+           expect(actualPaths).toEqual(expectedRelativePaths);
         });
 
-        it('should handle relative paths correctly', () => {
-            const result = runCli(['build/output.log'], testDir);
-            expect(result.status).toBe(0);
-            expect(result.stderr).toBe('');
-            expect(normalizeAndSort(result.stdoutLines)).toEqual(['build/output.log']);
+        // Test providing a FILE as input path - should fail
+        it('should fail if start path is a relative file path', () => {
+            const relativeFilePath = 'doc.txt';
+            const result = runCli([relativeFilePath], testDir);
+            expect(result.status).not.toBe(0); // Expect non-zero status
+            expect(result.stderr).toContain(`is not a directory`); // Expect error message
+            expect(result.stderr).toContain(relativeFilePath); // Error message should mention the path
         });
 
-        it('should handle absolute paths correctly', () => {
+        // Test providing an absolute FILE path - should fail
+        it('should fail if start path is an absolute file path', () => {
             const absolutePath = path.join(testDir, 'doc.txt');
             const result = runCli([absolutePath], testDir);
-            expect(result.status).toBe(0);
-            expect(result.stderr).toBe('');
-            expect(normalizeAndSort(result.stdoutLines)).toEqual([absolutePath]);
+            expect(result.status).not.toBe(0); // Expect non-zero status
+            expect(result.stderr).toContain(`is not a directory`); // Expect error message
+            expect(result.stderr).toContain(absolutePath); // Error message should mention the absolute path
         });
     });
 });

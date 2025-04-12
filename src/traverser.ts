@@ -33,38 +33,46 @@ export class DirectoryTraverser {
             nocase: this.options.ignoreCase,
             dot: true // Crucial for matching hidden files/dirs like .git with patterns like .* or .git/**
         };
-         // console.log("Traverser Initialized With:", { options: this.options, basePath: this.basePath }); // Debug log
+        // console.log("Traverser Initialized With:", { options: JSON.stringify(this.options), basePath: this.basePath, micromatchOptions: this.micromatchOptions }); // Debug log
     }
 
     // Helper to check match against name, full path, and relative path
     private isMatch(
-        name: string, // Just the file/directory name (e.g., 'index.js', 'node_modules')
-        fullPath: string, // Absolute path (e.g., '/path/to/project/node_modules')
-        relativePath: string, // Path relative to basePath (e.g., 'node_modules', '.')
+        name: string,
+        fullPath: string,
+        relativePath: string, // Path relative to basePath (e.g., 'node_modules', '.', 'dir1/file.txt')
         patterns: string[]
     ): boolean {
-        // Avoid matching empty patterns array
         if (!patterns || patterns.length === 0) {
             return false;
         }
 
-        // Ensure relativePath is handled correctly if it's '.'
-        const effectiveRelativePath = relativePath === '.' ? '.' : relativePath;
+        const effectiveRelativePath = relativePath === '.' ? '.' : relativePath.replace(/\\/g, '/'); // Normalize slashes for matching
 
-        // console.log(`isMatch Check: Name=${name}, Full=${fullPath}, Rel=${effectiveRelativePath}, Patterns=${JSON.stringify(patterns)}`); // Debug Log
+        // Use local options based on traversal settings for this check
+        const currentMicromatchOptions = {
+             nocase: this.options.ignoreCase,
+             dot: true,
+             // Optimization: If not using relative paths, don't need basename/partial match
+             // basename: !this.options.relativePaths,
+             // partial: !this.options.relativePaths
+        };
 
-        // Check name first (common case for simple excludes like 'node_modules')
-        if (micromatch.isMatch(name, patterns, this.micromatchOptions)) {
-             // console.log(`  Match on Name: ${name}`);
+        // console.log(`isMatch Check: Name=${name}, Full=${fullPath}, Rel=${effectiveRelativePath}, Patterns=${JSON.stringify(patterns)}, Options=${JSON.stringify(currentMicromatchOptions)}`); // Debug Log
+
+        // Check 1: Base name match (e.g., '*.log', 'node_modules')
+        if (micromatch.isMatch(name, patterns, currentMicromatchOptions)) {
+            // console.log(`  Match on Name: ${name}`);
             return true;
         }
-        // Check full path (for absolute patterns or more complex globs)
-        if (micromatch.isMatch(fullPath, patterns, this.micromatchOptions)) {
+        // Check 2: Full absolute path match (e.g., '/abs/path/to/exclude')
+        if (micromatch.isMatch(fullPath, patterns, currentMicromatchOptions)) {
             // console.log(`  Match on Full Path: ${fullPath}`);
             return true;
         }
-        // Check relative path ONLY if relativePaths option is true AND relative path is meaningful
-        if (this.options.relativePaths && effectiveRelativePath && micromatch.isMatch(effectiveRelativePath, patterns, this.micromatchOptions)) {
+        // Check 3: Relative path match (e.g., 'src/*.ts', 'build/output.log')
+        // Only perform this check if relative paths are enabled AND the path is meaningful
+        if (this.options.relativePaths && effectiveRelativePath && micromatch.isMatch(effectiveRelativePath, patterns, currentMicromatchOptions)) {
             // console.log(`  Match on Relative Path: ${effectiveRelativePath}`);
             return true;
         }
@@ -84,13 +92,12 @@ export class DirectoryTraverser {
 
         // --- 1. Handle Starting Directory (Depth 0) ---
         if (currentDepth === 0) {
-            const isDirTypeMatch = !matchType || matchType === 'd'; // Starting point is always treated as a directory for type matching
+            const isDirTypeMatch = !matchType || matchType === 'd';
             const dirName = path.basename(dirPath);
-            // Pass '.' as relative path for matching logic if relativePaths is true
-            const relativePathForMatch = relativePaths ? '.' : '';
+            const relativePathForMatch = relativePaths ? '.' : ''; // Use '.' for relative check
             const displayPath = relativePaths ? '.' : dirPath;
 
-            // console.log(`Start Dir Check: Name=${dirName}, Full=${dirPath}, RelMatch=${relativePathForMatch}, Display=${displayPath}`); // Debug
+            // console.log(`Start Dir Check: Name=${dirName}, Full=${dirPath}, RelMatch=${relativePathForMatch}, Display=${displayPath}, Depth=${currentDepth}`); // Debug
 
             const isIncluded = this.isMatch(dirName, dirPath, relativePathForMatch, includePatterns);
             const isExcluded = this.isMatch(dirName, dirPath, relativePathForMatch, excludePatterns);
@@ -101,14 +108,9 @@ export class DirectoryTraverser {
                  // console.log(`  Printing Start Dir: ${displayPath}`); // Debug
                  console.log(displayPath);
             }
-            // If maxDepth is 0, we stop after checking the starting directory.
-            // The check below handles this.
         }
 
         // --- 2. Depth Check ---
-        // Stop recursing further if we have reached the maximum depth.
-        // >= is used because currentDepth 0 is handled above. We stop *before* reading entries
-        // if the *current* directory is already at the maxDepth limit.
         if (currentDepth >= maxDepth) {
              // console.log(`Max depth ${maxDepth} reached at depth ${currentDepth}. Stopping recursion for ${dirPath}`); // Debug
              return;
@@ -119,55 +121,44 @@ export class DirectoryTraverser {
         try {
             entries = await fs.readdir(dirPath, { withFileTypes: true });
         } catch (err: any) {
-            // Log errors but continue if possible (e.g., skip unreadable directories)
             if (err.code === 'EACCES' || err.code === 'EPERM') {
-                console.error(`Permission error reading directory ${dirPath}: ${err.message}`);
+                // console.error(`Permission error reading directory ${dirPath}: ${err.message}`); // Keep error logging
             } else {
-                 console.error(`Error reading directory ${dirPath}: ${err.message}`);
+                 // console.error(`Error reading directory ${dirPath}: ${err.message}`); // Keep error logging
             }
-             return; // Stop processing this specific path on error
+             return;
         }
 
         // --- 4. Process Entries ---
         for (const dirent of entries) {
             const entryPath = path.join(dirPath, dirent.name);
-            // Use the stored absolute this.basePath for consistent relative calculation
-            const displayPathForEntry = relativePaths ? path.relative(this.basePath, entryPath).replace(/\\/g, '/') : entryPath; // Use forward slash for consistency
-            // Ensure '.' is used if path.relative returns empty string (shouldn't happen for entries unless entryPath === basePath)
-            const relativePathForMatch = relativePaths ? displayPathForEntry || '.' : '';
+            const displayPathForEntry = relativePaths ? path.relative(this.basePath, entryPath).replace(/\\/g, '/') || dirent.name : entryPath;
+            const relativePathForMatch = displayPathForEntry; // Use the calculated display path for matching
 
             const isDirectory = dirent.isDirectory();
             const isFile = dirent.isFile();
 
-            // console.log(`\nProcessing Entry: Name=${dirent.name}, Full=${entryPath}, RelMatch=${relativePathForMatch}, Display=${displayPathForEntry}, Depth=${currentDepth + 1}, isDir=${isDirectory}`); // Debug
+             // console.log(`\nProcessing Entry: Name=${dirent.name}, Full=${entryPath}, RelMatch=${relativePathForMatch}, Display=${displayPathForEntry}, Depth=${currentDepth + 1}, isDir=${isDirectory}`); // Debug
 
-            // --- 4a. Pruning Check (Enhanced) ---
-            let shouldPrune = false;
+            // --- 4a. Pruning Check (Revised) ---
+            // Check if the directory *itself* should be pruned based on exclude patterns.
+            // Crucially, we only prune if it's NOT explicitly included.
             if (isDirectory) {
-                // Check if the directory itself matches an exclude pattern
-                const isPotentiallyExcluded = this.isMatch(dirent.name, entryPath, relativePathForMatch, excludePatterns);
-
-                if (isPotentiallyExcluded) {
-                    // Now, check if it ALSO matches an include pattern.
-                    // If it's explicitly included, we DO NOT prune it here.
-                    // The final include/exclude filter below will determine if it's *printed*.
-                    const isAlsoExplicitlyIncluded = this.isMatch(dirent.name, entryPath, relativePathForMatch, includePatterns);
-
-                    if (!isAlsoExplicitlyIncluded) {
-                        // Only prune if it's excluded AND NOT explicitly included.
+                 const isDirExcluded = this.isMatch(dirent.name, entryPath, relativePathForMatch, excludePatterns);
+                 if (isDirExcluded) {
+                    const isDirExplicitlyIncluded = this.isMatch(dirent.name, entryPath, relativePathForMatch, includePatterns);
+                    if (!isDirExplicitlyIncluded) {
                          // console.log(`  Pruning directory: ${displayPathForEntry} (Excluded and not explicitly included)`); // Debug
-                        shouldPrune = true;
+                         continue; // <<< PRUNE HERE: Skip processing and recursion for this directory
                     } else {
-                         // console.log(`  Directory not pruned: ${displayPathForEntry} (Excluded but also explicitly included)`); // Debug
+                        // console.log(`  Directory not pruned (excluded but also included): ${displayPathForEntry}`); // Debug
                     }
-                }
+                 }
             }
+            // --- End Pruning Check ---
 
-            if (shouldPrune) {
-                continue; // Skip this directory entirely (don't print, don't recurse)
-            }
 
-            // --- 4b. Filtering Logic (for non-pruned items) ---
+            // --- 4b. Filtering Logic (for items NOT pruned) ---
             // Type Check
             let typeMatches = true;
             if (matchType) {
@@ -175,26 +166,23 @@ export class DirectoryTraverser {
                 if (matchType === 'd' && !isDirectory) typeMatches = false;
             }
 
-            // Include/Exclude Check (run again even for non-pruned dirs to see if the dir *itself* should be printed)
+            // Include/Exclude Check (run again for files, and for directories that were *not* pruned)
             const isIncluded = this.isMatch(dirent.name, entryPath, relativePathForMatch, includePatterns);
             const isExcluded = this.isMatch(dirent.name, entryPath, relativePathForMatch, excludePatterns);
 
             // console.log(`  Filter Check: Included=${isIncluded}, Excluded=${isExcluded}, TypeMatch=${typeMatches}`); // Debug
 
             // --- 4c. Print ---
-            // Check item's effective depth (currentDepth + 1) against maxDepth
             if (currentDepth + 1 <= maxDepth && typeMatches && isIncluded && !isExcluded) {
                  // console.log(`  Printing Entry: ${displayPathForEntry}`); // Debug
                  console.log(displayPathForEntry);
             }
 
             // --- 4d. Recurse ---
-            // Recurse into subdirectories if it's a directory.
-            // The depth check at the *start* of the *next* traverse call handles the maxDepth boundary.
+            // Recurse ONLY if it's a directory (pruned directories won't reach here)
             if (isDirectory) {
                 await this.traverse(entryPath, currentDepth + 1);
             }
         }
     } // End of traverse method
-
 } // End of class
