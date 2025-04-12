@@ -100,28 +100,36 @@ export class DirectoryTraverser {
         return (relPath || path.basename(fullPath)).replace(/\\/g, '/');
     }
 
-     /**
+    /**
      * Prepares a list of "explicit" include patterns used for overriding default excludes.
      * Handles patterns like 'dir/**' or 'dir/' matching the directory 'dir' itself.
+     * Excludes broad patterns like '*' and '.*' which shouldn't override defaults.
      */
     private getExplicitIncludePatternsForOverride(): string[] {
-        if (this.nonDefaultIncludePatterns.length === 0) {
+        // --- FIX: Filter out broad patterns ---
+        const specificNonDefaultIncludes = this.nonDefaultIncludePatterns.filter(p => p !== '*' && p !== '.*' && p !== '**');
+        if (specificNonDefaultIncludes.length === 0) {
             return [];
         }
-        const derivedPatterns = this.nonDefaultIncludePatterns.map(p => {
+        // --- FIX END ---
+
+        const derivedPatterns = specificNonDefaultIncludes.map(p => { // Use filtered list
+            // ... (rest of derived pattern logic remains the same)
             if (p.endsWith('/**')) return p.substring(0, p.length - 3);
             if (p.endsWith('/')) return p.substring(0, p.length - 1);
-            return null; // No derived pattern for this one
+            return null;
         }).filter((p): p is string => p !== null); // Filter out nulls and ensure type string
 
-        // Combine original non-default patterns with derived patterns, ensuring uniqueness
-        return [...new Set([...this.nonDefaultIncludePatterns, ...derivedPatterns])];
+        // Combine specific original non-default patterns with derived patterns
+        return [...new Set([...specificNonDefaultIncludes, ...derivedPatterns])];
     }
+
 
     /**
      * Checks if a directory should be pruned (i.e., not traversed into).
      * Prune if it matches an exclude pattern UNLESS it specifically matches
-     * an explicit (non-'*') include pattern.
+     * an explicit (non-'*', non-'.*') include pattern OR an explicit include
+     * pattern looks like it targets descendants.
      */
     private shouldPrune(
         name: string,
@@ -134,19 +142,41 @@ export class DirectoryTraverser {
             return false; // Not excluded, definitely don't prune
         }
 
-        // 2. If excluded, check if an *explicit* include pattern overrides the exclusion
-        // This prevents pruning 'node_modules' if `--name node_modules/specific-package` was used.
-        const explicitIncludes = this.getExplicitIncludePatternsForOverride();
+        // 2. If excluded, check if an *explicit* include pattern overrides the exclusion.
+        const explicitIncludes = this.getExplicitIncludePatternsForOverride(); // Gets specific includes
         if (explicitIncludes.length > 0) {
-             const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-             if (isExplicitlyIncluded) {
-                 return false; // Excluded, but explicitly included - DO NOT prune
+             // --- FIX START: Refined check for explicit include override ---
+             // Check if the directory ITSELF is explicitly included
+             const isDirExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
+             if (isDirExplicitlyIncluded) {
+                 // console.log(`DEBUG: Not pruning "${name}" because it is explicitly included.`);
+                 return false; // Directory itself matches an explicit include - DO NOT prune
              }
+
+             // Heuristic: Check if any explicit include pattern *might* target descendants
+             // If a pattern contains separators or globstars, assume it could match deeper.
+             const mightIncludeDescendants = explicitIncludes.some(p => p.includes('/') || p.includes('**'));
+             if (mightIncludeDescendants) {
+                 // Check if the *reason* for exclusion was a default exclude. If so, and an
+                 // explicit include might match descendants, don't prune yet. Let shouldPrintItem handle filtering later.
+                 const isExcludedByDefaultOnly = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet)) &&
+                                            !this.matchesAnyPattern(name, fullPath, relativePath,
+                                                this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p))
+                                            );
+
+                 if (isExcludedByDefaultOnly) {
+                     // console.log(`DEBUG: Not pruning "${name}" (default exclude) because explicit includes might match descendants.`);
+                     return false; // Don't prune default excludes if descendant includes exist
+                 }
+             }
+             // --- FIX END ---
         }
 
-        // 3. If excluded and not explicitly included, then prune
+        // 3. If excluded and not overridden by the logic above, then prune
+        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly included or overridden.`);
         return true;
     }
+
 
     /**
      * Checks if an item (file or directory) should be printed based on all filters.
@@ -180,64 +210,89 @@ export class DirectoryTraverser {
         // --- Item IS excluded. Now check if it's an override case ---
         // Override applies if:
         //   a) The exclusion comes *only* from a default pattern (e.g., 'node_modules').
-        //   b) The item *also* matches an explicit (non-'*') include pattern.
+        //   b) The item *also* matches a *specific* (non-'*', non-'.*') explicit include pattern.
 
         // Check if it matches ONLY default excludes
         const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet));
 
         if (isExcludedByDefault) {
-            // Now check if it matches any explicit include patterns
+            // Now check if it matches any *specific* explicit include patterns
+            // --- FIX: Use the refined override patterns ---
             const explicitIncludes = this.getExplicitIncludePatternsForOverride();
+            // --- FIX END ---
             if (explicitIncludes.length > 0) {
                 const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
                 if (isExplicitlyIncluded) {
-                    // console.log(`DEBUG: Printing "${name}" (excluded by default, but explicitly included)`);
+                    // console.log(`DEBUG: Printing "${name}" (excluded by default, but explicitly included by SPECIFIC pattern)`);
                     return true; // Override applies - PRINT
                 }
             }
         }
 
-        // --- If we reach here: Item is excluded, and it's either not a default exclude,
-        // --- or it wasn't explicitly included to trigger the override.
-        // console.log(`DEBUG: Not printing "${name}" (excluded)`);
+        // --- If we reach here: Item is excluded, and the override conditions were not met.
+        // console.log(`DEBUG: Not printing "${name}" (excluded, override check failed)`);
         return false; // Excluded - DO NOT PRINT
     }
+
 
     public async traverse(startPath: string, currentDepth: number = 0): Promise<void> {
         const resolvedStartPath = path.resolve(startPath); // Ensure start path is absolute
 
-        // --- 1. Handle Starting Directory (Depth 0) ---
-        // The starting directory itself should be considered for printing if depth >= 0.
+        // --- 1. Handle Starting Item (File or Directory) at Depth 0 ---
+        let canReadEntries = false; // Flag to control if we read directory entries
         if (currentDepth === 0) {
-            const dirName = path.basename(resolvedStartPath);
-            const isDirectory = true; // We assume validateStartPath ensures this
-            const isFile = false;
-            // Calculate relative path *before* calling shouldPrintItem
-            const relativePathForStart = this.calculateRelativePath(resolvedStartPath); // Will be '.' or ''
-            const displayPath = this.options.relativePaths ? '.' : resolvedStartPath; // Use '.' or absolute path
+            try {
+                // --- FIX START: Stat the starting path ---
+                const stats = await fs.stat(resolvedStartPath);
+                const isDirectory = stats.isDirectory();
+                const isFile = stats.isFile();
+                // --- FIX END ---
 
-            if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
-                console.log(displayPath);
+                // Check if the starting item itself should be printed
+                const dirName = path.basename(resolvedStartPath);
+                const relativePathForStart = this.calculateRelativePath(resolvedStartPath);
+                // --- FIX: Use resolved path if not relative ---
+                const displayPath = this.options.relativePaths ? relativePathForStart : resolvedStartPath;
+
+                if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
+                    console.log(displayPath);
+                }
+
+                // --- FIX: Only attempt to read entries if it's a directory ---
+                if (isDirectory) {
+                    canReadEntries = true;
+                }
+                // --- FIX END ---
+
+            } catch (err: any) {
+                // Handle errors like ENOENT or EACCES for the *starting* path specifically
+                console.error(`Error accessing start path ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
+                return; // Cannot proceed if the starting path is inaccessible
             }
+        } else {
+             // If not depth 0, we assume we are already inside a valid directory
+             canReadEntries = true;
         }
+
 
         // --- 2. Depth Check for Recursion ---
-        // Stop recursing if we have reached the maximum allowed depth.
-        // Note: maxDepth 0 means only the starting dir (handled above).
-        // maxDepth 1 means starting dir + direct children. We need to read entries if maxDepth > 0.
         if (currentDepth >= this.options.maxDepth) {
-            return;
+            return; // Stop recursing if max depth reached
         }
+
+        // --- FIX: Check if we determined we can read entries ---
+        if (!canReadEntries) {
+             return; // Stop if the starting item wasn't a directory or was inaccessible
+        }
+        // --- FIX END ---
 
         // --- 3. Read Directory Entries ---
         let entries: Dirent[];
         try {
-            // Use withFileTypes for efficiency, getting type info without extra stats calls
             entries = await fs.readdir(resolvedStartPath, { withFileTypes: true });
         } catch (err: any) {
-            // Report permission errors but continue if possible (fail gracefully)
+            // Report read errors for subdirectories but continue if possible
             if (err.code === 'EACCES' || err.code === 'EPERM') {
-                 // Use console.error for errors/warnings
                  console.error(`Permission error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
             } else {
                  console.error(`Error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
@@ -247,34 +302,27 @@ export class DirectoryTraverser {
 
         // --- 4. Process Each Entry ---
         for (const dirent of entries) {
-            const entryName = dirent.name;
-            const entryFullPath = path.join(resolvedStartPath, entryName);
-            const entryRelativePath = this.calculateRelativePath(entryFullPath); // Calc relative path for matching/display
-            const displayPath = this.options.relativePaths ? entryRelativePath : entryFullPath;
+             const entryName = dirent.name;
+             const entryFullPath = path.join(resolvedStartPath, entryName);
+             const entryRelativePath = this.calculateRelativePath(entryFullPath);
+             const displayPath = this.options.relativePaths ? entryRelativePath : entryFullPath;
 
-            const isDirectory = dirent.isDirectory();
-            const isFile = dirent.isFile();
+             const isDirectory = dirent.isDirectory();
+             const isFile = dirent.isFile();
 
-            // --- 4a. Pruning Check (for directories only) ---
-            // If a directory should be pruned, skip printing it AND recursing into it.
-            if (isDirectory && this.shouldPrune(entryName, entryFullPath, entryRelativePath)) {
-                // console.log(`DEBUG: Pruning directory: ${displayPath}`);
-                continue; // Skip this entry entirely
-            }
+             if (isDirectory && this.shouldPrune(entryName, entryFullPath, entryRelativePath)) {
+                 // console.log(`DEBUG: Pruning directory: ${displayPath}`);
+                 continue;
+             }
 
-            // --- 4b. Filtering & Printing ---
-            // Check if the *item itself* should be printed (passes all filters)
-            // No need for extra depth check here, pruning/recursion depth handles limits.
-            if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
+             if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
                  console.log(displayPath);
-            }
+             }
 
-            // --- 4c. Recurse into Subdirectories ---
-            // Only recurse if it's a directory AND we haven't finished exploring maxDepth levels.
-            // The depth check for recursion is handled at the START of the next call.
-            if (isDirectory) {
+             if (isDirectory) {
+                 // Depth check for next level happens at the *start* of the recursive call
                  await this.traverse(entryFullPath, currentDepth + 1);
-            }
+             }
         }
     } // End traverse
 } // End class

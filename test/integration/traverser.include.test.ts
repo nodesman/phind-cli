@@ -125,7 +125,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
         const expected = [
             path.join(testDir, '.hiddenDir'),
             path.join(testDir, '.hiddenfile'),
-            // path.join(testDir, '.git'), // Excluded by default via helper
+            // path.join(testDir, '.git'), // Excluded by default via helper and override logic
         ].sort();
          const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['.*'] });
         expect(results).toEqual(expected);
@@ -134,7 +134,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     it('should include hidden files/dirs when pattern explicitly matches them (.*) (relative)', async () => {
         const expected = [
             // '.', // Base dir itself is not hidden, doesn't match '.*' pattern
-            // '.git', // Excluded by default via helper
+            // '.git', // Excluded by default via helper and override logic
             '.hiddenDir',
             '.hiddenfile',
         ].sort();
@@ -150,7 +150,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
             path.join(testDir, '.hiddenDir', 'insideHidden.txt'),
             path.join(testDir, '.hiddenfile'),
             path.join(testDir, 'dir1', 'subDir1', '.hiddensub'),
-             // path.join(testDir, '.git'), // Excluded by default via helper
+             // path.join(testDir, '.git'), // Excluded by default via helper and override logic
         ].sort();
         // Needs both patterns to catch top-level and nested hidden items reliably
         const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['**/.*', '.*'] });
@@ -160,7 +160,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     it('should include hidden files/dirs anywhere using appropriate glob (** /.*) (relative)', async () => {
         const expected = [
             // '.', // Starting dir '.' is not hidden
-            // '.git', // Excluded by default via helper
+            // '.git', // Excluded by default via helper and override logic
             '.hiddenDir',
             '.hiddenDir/insideHidden.txt',
             '.hiddenfile',
@@ -190,7 +190,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     // --- Subdirectory Globstar (dir1/**) ---
     it('should include items within a specific subdirectory using ** (dir1/**) (absolute)', async () => {
         const expected = [
-            // No longer includes dir1 itself with only dir1/**
+            // path.join(testDir, 'dir1'), // Removed: dir1/** doesn't match dir1
             path.join(testDir, 'dir1', 'exclude_me.tmp'),
             path.join(testDir, 'dir1', 'file3.txt'),
             path.join(testDir, 'dir1', 'file6.data'),
@@ -207,6 +207,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
 
     it('should include items within a specific subdirectory using ** (dir1/**) (relative)', async () => {
         const expected = [
+            // 'dir1', // Removed: dir1/** doesn't match dir1
             'dir1/exclude_me.tmp',
             'dir1/file3.txt',
             'dir1/file6.data',
