@@ -220,15 +220,12 @@ export class DirectoryTraverser {
 
             // *** MODIFIED OVERRIDE LOGIC START ***
             // Override applies IF:
-            // 1. The item ITSELF matches a specific explicit include pattern, OR
-            // 2. ANY specific explicit include pattern exists (signaling user intent to override defaults),
-            //    AND the item matched ANY include pattern (like '*') before the exclusion check.
+            // 1. The item ITSELF matches a specific explicit include pattern.
             // Note: 'isIncluded' check already happened and was true to reach this point.
             if (explicitIncludes.length > 0) {
                  const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-                 // If the item itself is explicitly included, OR if *any* explicit pattern was given
-                 // (allowing parent dirs matching '*' to be printed when a descendant is explicit)
-                 if (isExplicitlyIncluded || explicitIncludes.length > 0) {
+                 // If the item itself is explicitly included
+                 if (isExplicitlyIncluded) { // MODIFIED: Override only if the item ITSELF matches an explicit include
                       // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies due to explicit includes)`);
                       return true; // Override applies - PRINT
                  }
