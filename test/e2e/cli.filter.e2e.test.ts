@@ -13,6 +13,7 @@ describe('CLI E2E - Filtering (Type, Depth)', () => {
         testDir = await fs.mkdtemp(tempDirPrefix);
         realTestDir = await fs.realpath(testDir); // Resolve symlinks
 
+        // Use the original testDir path for creating the structure
         await createTestStructure(testDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg',
@@ -30,12 +31,14 @@ describe('CLI E2E - Filtering (Type, Depth)', () => {
     });
 
     afterEach(async () => {
+        // Remove using the original path
         await fs.remove(testDir);
     });
 
     describe('Type Filtering (--type, -t)', () => {
         it('should find only files when --type f is used', () => {
-            const result = runCli(['--type', 'f'], testDir);
+            // Run CLI using the REAL path for CWD to avoid symlink issues during execution
+            const result = runCli(['--type', 'f'], realTestDir);
             expect(result.status).toBe(0);
             // Use realTestDir for expected absolute paths
             const expected = [
@@ -51,23 +54,22 @@ describe('CLI E2E - Filtering (Type, Depth)', () => {
         });
 
         it('should find only directories when --type d is used', () => {
-            const result = runCli(['--type', 'd'], testDir);
+             // Run CLI using the REAL path for CWD
+            const result = runCli(['--type', 'd'], realTestDir);
             expect(result.status).toBe(0);
              // Use realTestDir for expected absolute paths
             const expected = [
-                '.', // Should include starting dir itself if --relative is not used
-                'build',
-                'src',
-                'empty'
-            ].map(d => path.join(realTestDir, d)).sort();
-            // Check that the output *contains* the expected dirs.
-            // It might contain the starting dir '.' as well, depending on traverser logic.
-            // Update: The base directory itself is printed if it matches criteria.
+                realTestDir, // Use the realTestDir directly for the starting directory
+                path.join(realTestDir, 'build'),
+                path.join(realTestDir, 'src'),
+                path.join(realTestDir, 'empty'),
+            ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
         it('should ignore --type if not specified (absolute)', () => {
-            const result = runCli([], testDir);
+             // Run CLI using the REAL path for CWD
+            const result = runCli([], realTestDir);
             expect(result.status).toBe(0);
             const absolutePaths = result.stdoutLines.filter(line => path.isAbsolute(line));
             const relativePaths = result.stdoutLines.filter(line => !path.isAbsolute(line));
@@ -79,75 +81,87 @@ describe('CLI E2E - Filtering (Type, Depth)', () => {
         });
 
          it('should reject invalid values for --type', () => {
-             const result = runCli(['--type', 'x'], testDir);
+             // Run CLI using the REAL path for CWD
+             const result = runCli(['--type', 'x'], realTestDir);
              expect(result.status).not.toBe(0);
-             expect(result.stderr).toContain("Invalid values for argument type: Allowed values are f, d");
+             // Use regex to match core error message regardless of localization
+             expect(result.stderr).toMatch(/invalid values|ongeldige waarden/i);
+             expect(result.stderr).toContain('Argument: type');
+             expect(result.stderr).toMatch(/given: "x"|gegeven: "x"/i);
          });
     });
 
     describe('Depth Limiting (--maxdepth, -d)', () => {
         it('should find only the starting directory items with --maxdepth 0 (absolute)', () => {
-            const result = runCli(['--maxdepth', '0'], testDir);
+             // Run CLI using the REAL path for CWD
+            const result = runCli(['--maxdepth', '0'], realTestDir);
             expect(result.status).toBe(0);
             // Use realTestDir for expected absolute path
             expect(normalizeAndSort(result.stdoutLines)).toEqual([realTestDir]);
         });
 
         it('should find items up to depth 1 with --maxdepth 1 (absolute)', () => {
-            const result = runCli(['--maxdepth', '1'], testDir);
+            // Run CLI using the REAL path for CWD
+            const result = runCli(['--maxdepth', '1'], realTestDir);
             expect(result.status).toBe(0);
             // Use realTestDir for expected absolute paths
             const expected = [
-                realTestDir, // Starting directory itself
-                'doc.txt',
-                'image.jpg',
-                'script.js',
-                'build',
-                'src',
-                'empty'
-            ].map(f => path.join(realTestDir, f)).sort();
+                realTestDir, // Use realTestDir directly for the starting directory
+                path.join(realTestDir, 'doc.txt'),
+                path.join(realTestDir, 'image.jpg'),
+                path.join(realTestDir, 'script.js'),
+                path.join(realTestDir, 'build'),
+                path.join(realTestDir, 'src'),
+                path.join(realTestDir, 'empty'),
+            ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
         it('should find items up to a specific depth (e.g., 2) (absolute)', () => {
-            const result = runCli(['--maxdepth', '2'], testDir);
+             // Run CLI using the REAL path for CWD
+            const result = runCli(['--maxdepth', '2'], realTestDir);
             expect(result.status).toBe(0);
             // Use realTestDir for expected absolute paths
             const expected = [
-                realTestDir, // Starting directory itself
-                'doc.txt',
-                'image.jpg',
-                'script.js',
-                'build',
-                'build/output.log',
-                'build/app.exe',
-                'src',
-                'src/main.ts',
-                'src/util.ts',
-                'empty',
-            ].map(f => path.join(realTestDir, f)).sort();
+                realTestDir, // Use realTestDir directly for the starting directory
+                path.join(realTestDir, 'doc.txt'),
+                path.join(realTestDir, 'image.jpg'),
+                path.join(realTestDir, 'script.js'),
+                path.join(realTestDir, 'build'),
+                path.join(realTestDir, 'build', 'output.log'),
+                path.join(realTestDir, 'build', 'app.exe'),
+                path.join(realTestDir, 'src'),
+                path.join(realTestDir, 'src', 'main.ts'),
+                path.join(realTestDir, 'src', 'util.ts'),
+                path.join(realTestDir, 'empty'),
+            ].map(f => path.normalize(f)).sort(); // Normalize expected paths
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
         it('should behave as default (Infinity) if --maxdepth is not specified (absolute)', () => {
-            const result = runCli([], testDir);
+             // Run CLI using the REAL path for CWD
+            const result = runCli([], realTestDir);
             expect(result.status).toBe(0);
-            // Check it finds nested items, indicating depth > 2
+            // Check it finds nested items, indicating depth > 1
              expect(result.stdoutLines).toContain(path.join(realTestDir, 'build', 'output.log'));
              expect(result.stdoutLines).toContain(path.join(realTestDir, 'src', 'main.ts'));
-             expect(result.stdoutLines.length).toBeGreaterThan(7); // Starting dir + 6 items at depth 1 + 4 at depth 2 = 11
+             // Check total count: Start dir (1) + Depth 1 (6) + Depth 2 (4) = 11
+             expect(result.stdoutLines.length).toBe(11);
         });
 
         it('should accept --maxdepth 0', () => {
-             const result = runCli(['--maxdepth', '0'], testDir);
+             // Run CLI using the REAL path for CWD
+             const result = runCli(['--maxdepth', '0'], realTestDir);
              expect(result.status).toBe(0);
              // Use realTestDir for expected absolute path
              expect(normalizeAndSort(result.stdoutLines)).toEqual([realTestDir]);
         });
 
         it('should reject negative values for --maxdepth', () => {
-            const result = runCli(['--maxdepth', '-1'], testDir);
+             // Run CLI using the REAL path for CWD
+            const result = runCli(['--maxdepth', '-1'], realTestDir);
             expect(result.status).not.toBe(0);
+            // Check for the specific error message from the application logic
             expect(result.stderr).toContain("Argument maxdepth must be a non-negative number");
         });
     });

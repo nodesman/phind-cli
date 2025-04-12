@@ -101,36 +101,50 @@ export const runTraverse = async (
     consoleLogSpy: jest.SpyInstance,
     options: Partial<TraverseOptions> = {}
 ): Promise<string[]> => {
-    const hardcodedDefaults = ['node_modules', '.git']; // Define defaults common across tests
+    // Define defaults common across tests, matching PhindConfig hardcoded defaults
+    const hardcodedDefaults = ['node_modules', '.git'];
 
     // Start with base defaults for TraverseOptions
     const baseOptions: TraverseOptions = {
-        includePatterns: ['*'],
-        excludePatterns: [], // Placeholder, will be calculated
+        includePatterns: ['*'], // Default include pattern
+        excludePatterns: [],    // Base exclude list (will be combined)
         matchType: null,
         maxDepth: Number.MAX_SAFE_INTEGER,
         ignoreCase: false,
         relativePaths: false, // Default to absolute for base runner
-        defaultExcludes: hardcodedDefaults, // Pass defaults separately for override logic
+        defaultExcludes: hardcodedDefaults, // Pass the *actual* defaults separately
     };
 
-    // Merge user options from the test, allowing overrides of base defaults
+    // Merge user options from the test, allowing overrides of base defaults AND defaultExcludes itself
+    // If the test provides `excludePatterns`, they are *additional* patterns, not replacements
+    // If the test provides `defaultExcludes`, it overrides the hardcoded ones for this run
     const mergedOptions = { ...baseOptions, ...options };
 
-    // Calculate effective excludes based on the merged options (simulating PhindConfig)
+    // Calculate effective excludes *like PhindConfig would*
+    // Combine the defaults (potentially overridden by the test's options.defaultExcludes)
+    // with any additional excludePatterns provided in the test's options.
     const effectiveExcludes = [
-        ...mergedOptions.defaultExcludes, // Use the defaults potentially overridden by the test
-        ...(mergedOptions.excludePatterns || []) // Combine with provided patterns from merged options
+        ...(mergedOptions.defaultExcludes || []), // Use the defaults specified in mergedOptions
+        ...(options.excludePatterns || [])      // Add any *specific* exclude patterns from the test call
     ];
 
-    // Final options to pass to traverser, ensuring the combined exclude list is used
+    // Ensure uniqueness if desired (optional, depends on desired simulation accuracy)
+    // const uniqueEffectiveExcludes = [...new Set(effectiveExcludes)];
+
+    // Final options to pass to traverser
     const finalOptions: TraverseOptions = {
-        ...mergedOptions, // Carry over all other merged options (like includePatterns, maxDepth etc.)
+        ...mergedOptions, // Carry over all other merged options (includePatterns, maxDepth, ignoreCase, relativePaths etc.)
         excludePatterns: effectiveExcludes, // Use the *combined* list for the main exclusion logic
+        // Ensure defaultExcludes in the final options reflects what was used for the combination logic
+        // This is important for the override logic within the traverser itself.
+        defaultExcludes: mergedOptions.defaultExcludes || [],
     };
 
-    const traverser = new DirectoryTraverser(finalOptions, testDir); // Pass finalOptions
-    await traverser.traverse(testDir);
+    // Ensure basePath is absolute for the traverser constructor
+    const absoluteBasePath = path.resolve(testDir);
+
+    const traverser = new DirectoryTraverser(finalOptions, absoluteBasePath); // Pass finalOptions and absolute basePath
+    await traverser.traverse(absoluteBasePath); // Start traversal from the absolute path
 
     // Ensure you are using the correct relativePaths value for normalization
     return normalizeAndSort(consoleLogSpy.mock.calls, finalOptions.relativePaths);

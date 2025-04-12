@@ -24,6 +24,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
             'file1.txt',
             'file2.log',
         ].sort();
+        // Helper automatically applies default excludes now, which is fine for type=f
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { matchType: 'f', maxDepth: 1 });
         expect(results).toEqual(expected);
     });
@@ -31,21 +32,24 @@ describe('DirectoryTraverser - Option Combinations', () => {
     it('should find specific directory types within a certain depth (type=d, maxDepth=1) (relative)', async () => {
         const expected = [
             '.',
+            // '.git', // Excluded by default via helper
+            '.hiddenDir',
             'dir with spaces',
             'dir1',
             'dir2',
             'emptyDir',
+            // 'node_modules', // Excluded by default via helper
             'unreadable_dir',
-            '.hiddenDir'
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { matchType: 'd', maxDepth: 1, excludePatterns: ['node_modules', '.git'] });
+        // Helper automatically applies default excludes now, so no need to pass them in options here
+        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { matchType: 'd', maxDepth: 1 });
         expect(results).toEqual(expected);
     });
 
     it('should exclude patterns only up to a certain depth (exclude *.log, maxDepth=1)', async () => {
        const expected = [
             '.', // Start dir
-            '.git',
+            // '.git', // Excluded by default via helper
             '.hiddenDir',
             '.hiddenfile',
             ' Capitals.TXT',
@@ -54,8 +58,8 @@ describe('DirectoryTraverser - Option Combinations', () => {
             'dir2',
             'emptyDir',
             'file1.txt',
-            // 'file2.log' Excluded at depth 1
-            'node_modules',
+            // 'file2.log' Excluded by pattern at depth 1
+            // 'node_modules', // Excluded by default via helper
             'unreadable_dir',
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['*.log'], maxDepth: 1 });
@@ -65,6 +69,9 @@ describe('DirectoryTraverser - Option Combinations', () => {
     it('should include patterns only up to a certain depth (include *.txt, maxDepth=1)', async () => {
          // Only '.txt' files at depth 0 or 1. Case-insensitive due to ignoreCase: true
          // '.' is depth 0 but not a file and doesn't match '*.txt'
+         // '.hiddenDir/insideHidden.txt' is depth 2, excluded by maxDepth
+         // 'dir with spaces/file inside spaces.txt' is depth 2, excluded by maxDepth
+         // 'dir1/file3.txt' is depth 2, excluded by maxDepth
          // ' Capitals.TXT' is depth 1 and matches '*.txt' case-insensitively
          // 'file1.txt' is depth 1 and matches '*.txt'
         const expected = [
@@ -78,14 +85,16 @@ describe('DirectoryTraverser - Option Combinations', () => {
 
     it('should handle include, exclude, type, and depth simultaneously (absolute)', async () => {
          // Find only .txt files (case-insensitive) NOT in dir1, up to depth 2
+         // Default excludes applied by helper
         const expected = [
-            path.join(testDir, ' Capitals.TXT'),
-            path.join(testDir, 'file1.txt'),
-            path.join(testDir, '.hiddenDir', 'insideHidden.txt'),
-            path.join(testDir, 'dir with spaces', 'file inside spaces.txt'),
+            path.join(testDir, ' Capitals.TXT'), // Depth 1
+            path.join(testDir, 'file1.txt'), // Depth 1
+            path.join(testDir, '.hiddenDir', 'insideHidden.txt'), // Depth 2
+            path.join(testDir, 'dir with spaces', 'file inside spaces.txt'), // Depth 2
+            // path.join(testDir, 'dir1', 'file3.txt'), // Excluded by path pattern
         ].sort();
         const results = await runTraverse(testDir, spies.consoleLogSpy, {
-            includePatterns: ['**/*.txt'],
+            includePatterns: ['**/*.txt'], // Match all txt files
             excludePatterns: [path.join(testDir, 'dir1')], // Exclude dir1 entirely
             matchType: 'f',
             maxDepth: 2,
@@ -96,6 +105,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
 
     it('should handle include, exclude, type, and depth simultaneously (relative)', async () => {
          // Find only .txt files (case-insensitive) NOT in dir1, up to depth 2
+         // Default excludes applied by helper
         const expected = [
             // MaxDepth 1
             ' Capitals.TXT',
@@ -106,7 +116,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
             // 'dir1/file3.txt' is excluded by pattern 'dir1'
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
-            includePatterns: ['**/*.txt'],
+            includePatterns: ['**/*.txt'], // Match all txt files
             excludePatterns: ['dir1'], // Exclude dir1 entirely
             matchType: 'f',
             maxDepth: 2,
@@ -116,8 +126,11 @@ describe('DirectoryTraverser - Option Combinations', () => {
     });
 
     it('should handle ignoreCase combined with include patterns and type filter', async () => {
+       // Find files matching *.jpg case-insensitively
+       // Default excludes applied by helper
        const expected = [
-            'dir2/image.JPG'
+            'dir2/image.jpg', // Lowercase match
+            'dir2/image.JPG'  // Uppercase match due to ignoreCase
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
             includePatterns: ['*.jpg'],
@@ -131,7 +144,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
         const expected = [
             '.',
             // ' Capitals.TXT' is excluded by 'capitals.txt' + ignoreCase: true
-            '.git',
+            // '.git', // Excluded by default via helper
             '.hiddenDir',
             '.hiddenfile',
             'dir with spaces',
@@ -140,7 +153,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
             'emptyDir',
             'file1.txt', // Not excluded
             'file2.log', // Not excluded
-            'node_modules',
+            // 'node_modules', // Excluded by default via helper
             'unreadable_dir',
         ].sort();
 
@@ -154,43 +167,52 @@ describe('DirectoryTraverser - Option Combinations', () => {
     });
 
     it('should handle ignoreCase combined with pruning logic', async () => {
+       // Exclude dir1 case-insensitively
+       // Default excludes applied by helper
        const expected = [
             '.', // Starting dir
-            '.git', // Default exclude applied by helper
-            // .git contents should be excluded by default (helper combines now)
+            // '.git', // Excluded by default via helper
             '.hiddenDir',
-            // .hiddenDir contents included unless excluded otherwise
+            '.hiddenDir/insideHidden.txt', // Content of non-pruned dir
             '.hiddenfile',
-            // ' Capitals.TXT', // Included by default *
+            ' Capitals.TXT', // Not excluded
             'dir with spaces',
-            // dir with spaces contents included unless excluded otherwise
+            'dir with spaces/file inside spaces.txt', // Content of non-pruned dir
             'dir2',
-            // dir2 contents included unless excluded otherwise
+            'dir2/file5.log', // Content of non-pruned dir
+            'dir2/image.JPG', // Content of non-pruned dir
+            'dir2/image.jpg', // Content of non-pruned dir
             'emptyDir',
             'file1.txt',
             'file2.log',
-            'node_modules',
+            // 'node_modules', // Excluded by default via helper
             'unreadable_dir',
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['dir1'], ignoreCase: true });
-        // The helper now combines default excludes, so .git/* and node_modules/* should not be present
         expect(results).toEqual(expected);
     });
 
     it('should correctly prune case-insensitively when ignoreCase=true', async () => {
+        // Exclude dIr1 case-insensitively
+        // Default excludes applied by helper
         const expected = [
            '.',
-           '.git', // Default exclude applied by helper
-            // .git contents should be excluded by default (helper combines now)
+           // '.git', // Excluded by default via helper
            '.hiddenDir',
-            '.hiddenfile',
-            'dir with spaces',
-            'dir2',
+           '.hiddenDir/insideHidden.txt', // Content of non-pruned dir
+           '.hiddenfile',
+           ' Capitals.TXT', // Not excluded
+           'dir with spaces',
+           'dir with spaces/file inside spaces.txt', // Content of non-pruned dir
+           'dir2',
+           'dir2/file5.log', // Content of non-pruned dir
+           'dir2/image.JPG', // Content of non-pruned dir
+           'dir2/image.jpg', // Content of non-pruned dir
            'emptyDir',
-            'file1.txt',
-            'file2.log',
-            'node_modules',
-            'unreadable_dir',
+           'file1.txt',
+           'file2.log',
+           // 'node_modules', // Excluded by default via helper
+           'unreadable_dir',
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['dIr1'], ignoreCase: true });
         expect(results).toEqual(expected);
@@ -214,12 +236,12 @@ describe('DirectoryTraverser - Option Combinations', () => {
             'dir1/exclude_me.tmp',
             'dir1/file3.txt',
             'dir1/file6.data',
-            // dir1/subDir1/file4.js is depth 3
-            // dir2/** is pruned
+            // dir1/subDir1/file4.js is depth 3, excluded by maxDepth
+            // dir2/** is pruned by exclude 'dir2'
         ].sort();
 
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
-            includePatterns: ['*'], // Default include needed to find items
+            // No need for includePatterns: ['*'] as it's the default in the helper
             excludePatterns: ['dir2'], // Explicitly prune dir2
             matchType: 'f',
             maxDepth: 2
@@ -229,20 +251,23 @@ describe('DirectoryTraverser - Option Combinations', () => {
 
     it('should find directories excluding those matching sub-patterns (relative, type=d)', async () => {
          // Find directories ONLY (type=d)
-         // Exclude hidden dirs/files (**/.*) and files starting with 'file' (**/file*)
+         // Exclude hidden dirs/files (**/.*) and items starting with 'file' (**/file*)
          // Default excludes (.git, node_modules) are applied by helper
          const expected = [
             '.',
+            // '.git', // Excluded by default helper
             // '.hiddenDir', // Excluded by **/.*
             'dir with spaces',
             'dir1',
+            'dir1/subDir1', // Not hidden, does not start with 'file'
             'dir2',
             'emptyDir',
-            // 'node_modules', // Excluded by default
+            // 'node_modules', // Excluded by default helper
             'unreadable_dir',
+            // Files like file1.txt, file2.log are excluded by **/file* and type=d
          ].sort();
          const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
-            includePatterns: ['*'], // Need '*' to potentially match directories
+            // No includePatterns needed (default is '*')
             excludePatterns: ['**/.*', '**/file*'], // Exclude hidden and 'file*' items
             matchType: 'd' // Only directories
          });
