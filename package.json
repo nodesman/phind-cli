@@ -33,6 +33,7 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29.5.14",
     "@types/micromatch": "^4.0.2",
