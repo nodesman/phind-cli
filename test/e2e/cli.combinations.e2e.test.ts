@@ -21,7 +21,8 @@ describe('CLI E2E - Option Combinations', () => {
         await createTestStructure(tempDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg', // Lowercase for case test
-            'image.JPG': 'jpeg upper', // Uppercase for case test
+            // 'image.JPG': 'jpeg upper', // <<< CHANGE THIS
+            'image_upper.JPG': 'jpeg upper', // <<< TO THIS (unique name)
             'script.js': 'javascript',
             'build': {
                 'output.log': 'log data',
@@ -68,10 +69,11 @@ describe('CLI E2E - Option Combinations', () => {
 
     it('should correctly combine --exclude, --ignore-case, and --maxdepth 1 (relative)', () => {
         // Switched to relative paths
-        // Excludes image.JPG (and image.jpg because of --ignore-case)
+        // Excludes image_upper.JPG (and image.jpg because of --ignore-case and pattern *.jpg)
         // Maxdepth 1 includes start dir + immediate children
         // Default excludes (.git, node_modules) ARE applied automatically by the app
-        const result = runCli(['--exclude', 'IMAGE.JPG', '--ignore-case', '--maxdepth', '1', '--relative'], testDir);
+        // Use a pattern that matches both to test exclude + ignore case
+        const result = runCli(['--exclude', '*.jpg', '--ignore-case', '--maxdepth', '1', '--relative'], testDir);
         expect(result.status).toBe(0);
         const expected = [
             '.', // <-- Starting dir relative
@@ -86,12 +88,14 @@ describe('CLI E2E - Option Combinations', () => {
 
     it('should correctly combine --name and --ignore-case (relative)', () => {
         // Switched to relative paths
-        // Should find both image.jpg and image.JPG
-        const result = runCli(['--name', 'IMAGE.JPG', '--ignore-case', '--relative'], testDir);
+        // Should find both image.jpg and image_upper.JPG when matching IMAGE.JPG case-insensitively
+        // const result = runCli(['--name', 'IMAGE.JPG', '--ignore-case', '--relative'], testDir); // <<< ORIGINAL PATTERN
+        const result = runCli(['--name', '*.jpg', '--ignore-case', '--relative'], testDir); // <<< BETTER PATTERN TO TEST CASE INSENSITIVITY
         expect(result.status).toBe(0);
         const expected = [
             'image.jpg', // <-- Expect relative path
-            'image.JPG', // <-- Expect relative path
+            // 'image.JPG', // <-- CHANGE THIS
+            'image_upper.JPG', // <-- TO THIS
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
@@ -103,6 +107,10 @@ describe('CLI E2E - Option Combinations', () => {
         // Default maxdepth (infinity)
         // --no-global-ignore ensures only CLI excludes apply (default built-in excludes are not overridden here)
         const result = runCli(['--name', '*', '--exclude', 'node_modules', '.git', '--no-global-ignore', '--relative'], testDir);
+        // --->>> Check stderr if this still fails <<<---
+        if (result.status !== 0) {
+            console.error("Test Failure Stderr:", result.stderr);
+        }
         expect(result.status).toBe(0); // Status should be 0 if successful
         const expected = [
             '.', // <-- Starting dir relative
@@ -111,7 +119,8 @@ describe('CLI E2E - Option Combinations', () => {
             'build/output.log',
             'doc.txt',
             'empty',
-            'image.JPG',
+            // 'image.JPG', // <-- CHANGE THIS
+            'image_upper.JPG', // <-- TO THIS
             'image.jpg',
             'script.js',
             'src',
@@ -132,7 +141,8 @@ describe('CLI E2E - Option Combinations', () => {
             '.', // <-- Starting dir relative (depth 0)
             'doc.txt', // <-- Depth 1
             'empty', // <-- Depth 1
-            'image.JPG', // <-- Depth 1
+            // 'image.JPG', // <-- CHANGE THIS (Depth 1)
+            'image_upper.JPG', // <-- TO THIS (Depth 1)
             'image.jpg', // <-- Depth 1
             'script.js', // <-- Depth 1
             'src', // <-- Depth 1
