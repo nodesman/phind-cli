@@ -31,9 +31,17 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.14",
     "@types/micromatch": "^4.0.2",
     "@types/node": "^18.0.0",
+    "@types/tmp": "^0.2.6",
     "@types/yargs": "^17.0.24",
+    "cross-spawn": "^7.0.6",
+    "fs-extra": "^11.3.0",
+    "jest": "^29.7.0",
+    "tmp": "^0.2.3",
+    "ts-jest": "^29.3.1",
     "typescript": "^5.0.0"
   },
   "engines": {
