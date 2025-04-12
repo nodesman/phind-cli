@@ -101,22 +101,39 @@ export const runTraverse = async (
     consoleLogSpy: jest.SpyInstance,
     options: Partial<TraverseOptions> = {}
 ): Promise<string[]> => {
-    // Provide a sensible default for defaultExcludes *before* spreading options
-    const defaultOptions: TraverseOptions = {
+    const hardcodedDefaults = ['node_modules', '.git']; // Define defaults common across tests
+
+    // Start with base defaults for TraverseOptions
+    const baseOptions: TraverseOptions = {
         includePatterns: ['*'],
-        excludePatterns: [], // Keep explicitly empty unless overridden by options
+        excludePatterns: [], // Placeholder, will be calculated
         matchType: null,
         maxDepth: Number.MAX_SAFE_INTEGER,
         ignoreCase: false,
         relativePaths: false, // Default to absolute for base runner
-        defaultExcludes: ['node_modules', '.git'], // <-- Add a default value here
-        ...options, // Spread options AFTER defaults, allowing tests to override them
+        defaultExcludes: hardcodedDefaults, // Pass defaults separately for override logic
     };
-    const traverser = new DirectoryTraverser(defaultOptions, testDir);
+
+    // Merge user options from the test, allowing overrides of base defaults
+    const mergedOptions = { ...baseOptions, ...options };
+
+    // Calculate effective excludes based on the merged options (simulating PhindConfig)
+    const effectiveExcludes = [
+        ...mergedOptions.defaultExcludes, // Use the defaults potentially overridden by the test
+        ...(mergedOptions.excludePatterns || []) // Combine with provided patterns from merged options
+    ];
+
+    // Final options to pass to traverser, ensuring the combined exclude list is used
+    const finalOptions: TraverseOptions = {
+        ...mergedOptions, // Carry over all other merged options (like includePatterns, maxDepth etc.)
+        excludePatterns: effectiveExcludes, // Use the *combined* list for the main exclusion logic
+    };
+
+    const traverser = new DirectoryTraverser(finalOptions, testDir); // Pass finalOptions
     await traverser.traverse(testDir);
 
     // Ensure you are using the correct relativePaths value for normalization
-    return normalizeAndSort(consoleLogSpy.mock.calls, defaultOptions.relativePaths);
+    return normalizeAndSort(consoleLogSpy.mock.calls, finalOptions.relativePaths);
 };
 
 // Convenience runner for relative paths

@@ -61,7 +61,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
     it('should exclude items matching a pattern with case sensitivity by default (relative)', async () => {
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['*.JPG'] });
         expect(results).not.toContain('dir2/image.JPG');
-        expect(results).toContain('dir2/image.jpg'); //lowercase still included
+        expect(results).toContain('dir2/image.jpg'); // lowercase still included
     });
 
     it('should exclude hidden files/dirs when pattern explicitly matches them (.*) (absolute)', async () => {
@@ -180,18 +180,19 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
     });
 
     it('should correctly exclude items even if they also match an include pattern (exclude priority)', async () => {
+         // Include *.txt (case-insensitive), but exclude file1.txt specifically
          const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
-            includePatterns: ['*.txt'],
-            excludePatterns: ['file1.txt'],
-            ignoreCase: true // <-- FIX: Add ignoreCase: true so '*.txt' matches ' Capitals.TXT'
-        });
+             includePatterns: ['*.txt'],
+             excludePatterns: ['file1.txt'], // Explicit exclude takes priority
+             ignoreCase: true // Make include case-insensitive
+         });
 
          expect(results).not.toContain('file1.txt');
          expect(results).toContain(' Capitals.TXT');
          expect(results).toContain('.hiddenDir/insideHidden.txt'); // Should also be included now
          expect(results).toContain('dir with spaces/file inside spaces.txt');
          expect(results).toContain('dir1/file3.txt');
-    });
+     });
 
     it('should simulate default excludes (.git, node_modules) correctly', async () => {
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['node_modules', '.git'] });
