@@ -13,13 +13,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.PhindApp = void 0;
 // src/cli.ts
 const path_1 = __importDefault(require("path"));
 const yargs_1 = __importDefault(require("yargs/yargs"));
 const helpers_1 = require("yargs/helpers");
 const promises_1 = __importDefault(require("fs/promises"));
-const config_1 = require("./config"); // Import new Config class
-const traverser_1 = require("./traverser"); // Import new Traverser class
+const config_1 = require("./config"); // Import Config class
+const traverser_1 = require("./traverser"); // Import Traverser class
 class PhindApp {
     constructor() {
         this.config = new config_1.PhindConfig();
@@ -27,6 +28,7 @@ class PhindApp {
     // Method to parse arguments using yargs
     parseArguments() {
         return __awaiter(this, void 0, void 0, function* () {
+            // Note: Need to await the argv promise yargs returns
             return yield (0, yargs_1.default)((0, helpers_1.hideBin)(process.argv))
                 .usage('Usage: $0 [path] [options]')
                 .command('$0 [path]', 'Find files/directories recursively', (yargs) => {
@@ -42,15 +44,16 @@ class PhindApp {
                 array: true,
                 description: 'Glob pattern(s) for filenames/paths to include (default: *)',
                 defaultDescription: '"*" (all files/dirs)',
-                default: ['*'],
+                default: ['*'], // Default include pattern
             })
                 .option('exclude', {
                 alias: 'e',
                 type: 'string',
                 array: true,
+                // Updated description to reference config method for clarity
                 description: `Glob pattern(s) to exclude. Also reads from ${this.config.getGlobalIgnorePath()} unless --no-global-ignore is used.`,
-                default: [], // Handled by config class now
-                defaultDescription: this.config.getDefaultExcludesDescription(),
+                default: [], // Defaults are now handled by PhindConfig
+                defaultDescription: this.config.getDefaultExcludesDescription(), // Get defaults description from config
             })
                 .option('no-global-ignore', {
                 type: 'boolean',
@@ -60,7 +63,7 @@ class PhindApp {
                 .option('type', {
                 alias: 't',
                 type: 'string',
-                choices: ['f', 'd'],
+                choices: ['f', 'd'], // Use as const for stricter type checking
                 description: 'Match only files (f) or directories (d)',
             })
                 .option('maxdepth', {
@@ -68,6 +71,12 @@ class PhindApp {
                 type: 'number',
                 description: 'Maximum directory levels to descend (0 means starting path only)',
                 default: Infinity,
+                coerce: (val) => {
+                    if (val < 0) {
+                        throw new Error("Argument maxdepth must be a non-negative number.");
+                    }
+                    return val === Infinity ? Number.MAX_SAFE_INTEGER : val; // Use MAX_SAFE_INTEGER internally
+                }
             })
                 .option('ignore-case', {
                 alias: 'i',
@@ -83,27 +92,30 @@ class PhindApp {
             })
                 .help()
                 .alias('help', 'h')
-                .strict()
-                .argv; // Await the promise here
+                .strict() // Enable strict mode for unknown options/arguments
+                .argv; // Ensure yargs processing is awaited
         });
     }
     // Method to validate the starting path
     validateStartPath(startArgPath) {
         return __awaiter(this, void 0, void 0, function* () {
-            const startPath = path_1.default.resolve(startArgPath);
+            const startPath = path_1.default.resolve(startArgPath); // Resolve relative paths (like '.')
             try {
                 const stats = yield promises_1.default.stat(startPath);
                 if (!stats.isDirectory()) {
-                    throw new Error(`Start path "${startArgPath}" is not a directory.`);
+                    throw new Error(`Start path "${startArgPath}" (resolved to "${startPath}") is not a directory.`);
                 }
-                return startPath; // Return resolved, validated path
+                return startPath; // Return the resolved, validated absolute path
             }
             catch (err) {
                 if (err.code === 'ENOENT') {
-                    throw new Error(`Start path "${startArgPath}" not found.`);
+                    throw new Error(`Start path "${startArgPath}" (resolved to "${startPath}") not found.`);
+                }
+                else if (err.code === 'EACCES') {
+                    throw new Error(`Permission denied accessing start path "${startArgPath}" (resolved to "${startPath}").`);
                 }
                 else {
-                    throw new Error(`Error accessing start path "${startArgPath}": ${err.message}`);
+                    throw new Error(`Error accessing start path "${startArgPath}" (resolved to "${startPath}"): ${err.message}`);
                 }
             }
         });
@@ -116,28 +128,34 @@ class PhindApp {
                 const argv = yield this.parseArguments();
                 // Load global ignores if not disabled
                 if (!argv.noGlobalIgnore) {
+                    // Use forceReload=false (default) unless needed
                     yield this.config.loadGlobalIgnores();
                 }
-                // Set CLI excludes in config
+                // Set CLI excludes in config (after loading globals)
                 this.config.setCliExcludes(argv.exclude);
-                // Validate path
+                // Validate the starting path argument AFTER parsing args
                 const startArgPath = argv.path;
                 const startPath = yield this.validateStartPath(startArgPath);
-                const basePath = startPath; // Use validated path as base
+                // *** Crucial: basePath must be the validated, resolved startPath ***
+                const basePath = startPath;
                 // Prepare options for the traverser
-                const maxDepth = argv.maxdepth === Infinity ? Number.MAX_SAFE_INTEGER : argv.maxdepth;
+                // MAX_SAFE_INTEGER is handled by yargs coerce now
+                const maxDepth = argv.maxdepth;
                 const traverseOptions = {
-                    excludePatterns: this.config.getEffectiveExcludePatterns(), // Get combined list
+                    // Get the combined list of excludes from config
+                    excludePatterns: this.config.getEffectiveExcludePatterns(),
+                    // Get includes directly from arguments
                     includePatterns: argv.name,
+                    // Use validated type or null
                     matchType: (_a = argv.type) !== null && _a !== void 0 ? _a : null,
                     maxDepth: maxDepth,
                     ignoreCase: argv.ignoreCase,
                     relativePaths: argv.relative,
-                    basePath: basePath
+                    // basePath is now passed to the constructor, not here
                 };
-                // Create and run the traverser
-                const traverser = new traverser_1.DirectoryTraverser(traverseOptions);
-                yield traverser.traverse(startPath); // Start traversal
+                // Create and run the traverser, passing the resolved basePath
+                const traverser = new traverser_1.DirectoryTraverser(traverseOptions, basePath);
+                yield traverser.traverse(startPath); // Start traversal from the resolved path
             }
             catch (error) {
                 // Catch errors from parsing, validation, or traversal
@@ -147,12 +165,15 @@ class PhindApp {
         });
     }
 }
+exports.PhindApp = PhindApp;
 // --- Application Entry Point ---
-// Create an instance of the app and run it
-const app = new PhindApp();
-app.run().catch(err => {
-    // Catch unexpected errors not handled within run()
-    console.error("\nAn unexpected critical error occurred:", err);
-    process.exit(1);
-});
+// Only run the app if this script is executed directly
+if (require.main === module) {
+    const app = new PhindApp();
+    app.run().catch(err => {
+        // Catch unexpected errors not handled within run()
+        console.error("\nAn unexpected critical error occurred:", err);
+        process.exit(1);
+    });
+}
 //# sourceMappingURL=cli.js.map
