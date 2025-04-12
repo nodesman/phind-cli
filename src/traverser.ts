@@ -207,29 +207,36 @@ export class DirectoryTraverser {
             return true; // Included and not excluded - PRINT
         }
 
-        // --- Item IS excluded. Now check if it's an override case ---
-        // Override applies if:
-        //   a) The exclusion comes *only* from a default pattern (e.g., 'node_modules').
-        //   b) The item *also* matches a *specific* (non-'*', non-'.*') explicit include pattern.
+        // --- Item IS excluded. Now check for override ---
+        // Is the exclusion *only* because of a default pattern?
+        const isExcludedByDefaultOnly = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet)) &&
+                                        !this.matchesAnyPattern(name, fullPath, relativePath,
+                                            this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p)) // Excludes NOT in the default set
+                                        );
 
-        // Check if it matches ONLY default excludes
-        const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet));
-
-        if (isExcludedByDefault) {
-            // Now check if it matches any *specific* explicit include patterns
-            // --- FIX: Use the refined override patterns ---
+        if (isExcludedByDefaultOnly) {
+            // Get the specific (non-'*', non-'.*', non-'**') include patterns
             const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-            // --- FIX END ---
+
+            // *** MODIFIED OVERRIDE LOGIC START ***
+            // Override applies IF:
+            // 1. The item ITSELF matches a specific explicit include pattern, OR
+            // 2. ANY specific explicit include pattern exists (signaling user intent to override defaults),
+            //    AND the item matched ANY include pattern (like '*') before the exclusion check.
+            // Note: 'isIncluded' check already happened and was true to reach this point.
             if (explicitIncludes.length > 0) {
-                const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-                if (isExplicitlyIncluded) {
-                    // console.log(`DEBUG: Printing "${name}" (excluded by default, but explicitly included by SPECIFIC pattern)`);
-                    return true; // Override applies - PRINT
-                }
+                 const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
+                 // If the item itself is explicitly included, OR if *any* explicit pattern was given
+                 // (allowing parent dirs matching '*' to be printed when a descendant is explicit)
+                 if (isExplicitlyIncluded || explicitIncludes.length > 0) {
+                      // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies due to explicit includes)`);
+                      return true; // Override applies - PRINT
+                 }
             }
+            // *** MODIFIED OVERRIDE LOGIC END ***
         }
 
-        // --- If we reach here: Item is excluded, and the override conditions were not met.
+        // --- If we reach here: Item is excluded, and override conditions were not met.
         // console.log(`DEBUG: Not printing "${name}" (excluded, override check failed)`);
         return false; // Excluded - DO NOT PRINT
     }
