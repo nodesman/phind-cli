@@ -151,8 +151,8 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
             path.join(testDir, '.hiddenDir'),
             // path.join(testDir, '.hiddenDir', 'insideHidden.txt'), // Doesn't start with '.' - Correctly excluded
             path.join(testDir, '.hiddenfile'),
+            // path.join(testDir, '.git'), // Excluded by default via helper and override logic
             path.join(testDir, 'dir1', 'subDir1', '.hiddensub'),
-             // path.join(testDir, '.git'), // Excluded by default via helper and override logic - Should be removed by fix
         ].sort();
         // Needs both patterns to catch top-level and nested hidden items reliably
         const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['**/.*', '.*'] });
@@ -162,11 +162,11 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     it('should include hidden files/dirs anywhere using appropriate glob (** /.*) (relative)', async () => {
         const expected = [
             // '.', // Starting dir '.' is not hidden
-            // '.git', // Excluded by default via helper and override logic - Should be removed by fix
             '.hiddenDir',
             // '.hiddenDir/insideHidden.txt', // Doesn't start with '.' - Correctly excluded
             '.hiddenfile',
-            'dir1/subDir1/.hiddensub'
+            'dir1/subDir1/.hiddensub',
+            // '.git', // Excluded by default via helper and override logic
         ].sort();
         // Needs both patterns to catch top-level and nested hidden items reliably
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { includePatterns: ['**/.*', '.*'] });
