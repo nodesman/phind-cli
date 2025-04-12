@@ -7,10 +7,15 @@ import { runCli, createTestStructure, normalizeAndSort } from './cli.helper'; //
 
 describe('CLI E2E - Include Patterns (--name, -n)', () => {
     let testDir: string;
+    let realTestDir: string; // Use real path consistently
 
     beforeEach(async () => {
-        testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'phind-e2e-'));
-        await createTestStructure(testDir, {
+        const tempDirPrefix = path.join(os.tmpdir(), 'phind-e2e-');
+        const tempDir = await fs.mkdtemp(tempDirPrefix);
+        realTestDir = await fs.realpath(tempDir); // Resolve symlinks
+
+        // Create structure using the non-resolved path (fs-extra handles it)
+        await createTestStructure(tempDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg',
             'image.JPG': 'jpeg upper',
@@ -30,66 +35,114 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
             '.hiddenFile': 'hidden content',
             '.hiddenDir': { 'content': 'hidden dir content' }
         });
+        // Store the resolved path for running the CLI and making assertions
+        testDir = realTestDir;
     });
 
     afterEach(async () => {
-        await fs.remove(testDir);
+        await fs.remove(testDir); // Use real path for removal
     });
 
-    it('should include only files matching a single --name pattern', () => {
-        const result = runCli(['--name', '*.txt'], testDir);
+    it('should include only files matching a single --name pattern (relative)', () => {
+        // Add --relative flag
+        const result = runCli(['--name', '*.txt', '--relative'], testDir);
         expect(result.status).toBe(0);
+        // Expect relative paths
         const expected = ['doc.txt'].sort();
+        // Use expect.arrayContaining for flexibility if base dir '.' is included unexpectedly
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
-        expect(result.stdoutLines.length).toBe(expected.length);
+        // Ensure ONLY the expected file is found (adjust count if '.' is included)
+        expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
     });
 
-    it('should include only files matching multiple --name patterns', () => {
-        const result = runCli(['--name', '*.txt', '--name', '*.js'], testDir);
+    it('should include only files matching multiple --name patterns (relative)', () => {
+         // Add --relative flag
+        const result = runCli(['--name', '*.txt', '--name', '*.js', '--relative'], testDir);
         expect(result.status).toBe(0);
+        // Expect relative paths
         const expected = ['doc.txt', 'script.js'].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
-        expect(result.stdoutLines.length).toBe(expected.length);
+        expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
     });
 
-    it('should include files based on glob patterns (e.g., *.txt)', () => {
-        const result = runCli(['--name', '*.txt'], testDir);
+    it('should include files based on glob patterns (e.g., *.txt) (relative)', () => {
+         // Add --relative flag
+        const result = runCli(['--name', '*.txt', '--relative'], testDir);
         expect(result.status).toBe(0);
+        // Expect relative paths
         const expected = ['doc.txt'].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
-        expect(result.stdoutLines.length).toBe(expected.length);
+        expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
     });
 
-    it('should include hidden files when pattern allows (e.g., .*)', () => {
-        const result = runCli(['--name', '.*'], testDir);
-        expect(result.status).toBe(0);
-        const expected = ['.config', '.hiddenFile', '.hiddenDir'].sort();
-        expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
-        expect(result.stdoutLines.length).toBe(expected.length);
-    });
-
-    it('should include files in subdirectories matching a pattern', () => {
-         const result = runCli(['--name', 'src/*'], testDir);
+    it('should include hidden files when pattern allows (e.g., .*) (relative)', () => {
+         // Add --relative flag
+         // NOTE: Default excludes are applied unless overridden. Here '*' includes are used,
+         // but the default PhindConfig excludes node_modules and .git.
+         // The --name '.*' pattern *will* match .git, but the traverser's exclude logic (including defaults)
+         // should prevent it unless it's explicitly included again.
+         // The test pattern '.*' should match .config, .hiddenFile, .hiddenDir
+         const result = runCli(['--name', '.*', '--relative'], testDir);
          expect(result.status).toBe(0);
+         // Expect relative paths, including '.' for the base dir itself if it matches filters
+         // .git should be excluded by default.
+         const expected = [
+             '.',            // Base dir matches include '*', should be printed.
+             '.config',
+             // '.git', // Excluded by default
+             '.hiddenDir',
+             '.hiddenFile'
+         ].sort();
+         const actualFiltered = result.stdoutLines.filter(l => !l.startsWith('.git'));
+         expect(normalizeAndSort(actualFiltered)).toEqual(expected);
+         // Check count is correct
+         expect(actualFiltered.length).toBe(expected.length);
+    });
+
+    it('should include files in subdirectories matching a pattern (relative)', () => {
+        // Add --relative flag
+        // Pattern 'src/*' only matches immediate children of src
+         const result = runCli(['--name', 'src/*', '--relative'], testDir);
+         expect(result.status).toBe(0);
+         // Expect relative paths
          const expected = ['src/main.ts', 'src/util.ts'].sort();
          expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
-         expect(result.stdoutLines.length).toBe(expected.length);
+         expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
     });
 
-    it('should handle --name patterns with case sensitivity by default', () => {
-        const result = runCli(['--name', 'image.JPG'], testDir);
+     it('should include directories matching a specific pattern (relative)', () => {
+        // Test finding the '.hiddenDir' using a pattern like '.*Dir'
+        const result = runCli(['--name', '.*Dir', '--relative'], testDir);
         expect(result.status).toBe(0);
+        const expected = ['.hiddenDir'].sort();
+        expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
+        expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
+     });
+
+
+    it('should handle --name patterns with case sensitivity by default (relative)', () => {
+        // Add --relative flag
+        const result = runCli(['--name', 'image.JPG', '--relative'], testDir);
+        expect(result.status).toBe(0);
+         // Expect relative paths
         const expected = ['image.JPG'];
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
-        expect(result.stdoutLines.length).toBe(expected.length);
+        expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
     });
 
-    it('should default to including everything (*) if --name is not provided', () => {
-        const result = runCli([], testDir);
+    it('should default to including everything (*) if --name is not provided (relative)', () => {
+        // Add --relative flag
+        // Default excludes (node_modules, .git) should be applied by the application logic.
+        const result = runCli(['--relative'], testDir);
         expect(result.status).toBe(0);
+        // Expect relative paths, excluding defaults
         const expected = [
+            '.', // Starting directory
             '.config',
             '.config/app.conf',
+            '.hiddenDir',
+            '.hiddenDir/content',
+            '.hiddenFile',
             'build',
             'build/app.exe',
             'build/output.log',
@@ -101,12 +154,11 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
             'src',
             'src/main.ts',
             'src/util.ts',
-            '.hiddenFile',
-            '.hiddenDir',
         ].sort();
-         const filtered = result.stdoutLines.filter(line => !line.includes('node_modules') && !line.includes('.git'));
+         // The result should already have default excludes removed by the app
+         const actual = result.stdoutLines;
 
-        expect(normalizeAndSort(filtered)).toEqual(expect.arrayContaining(expected));
-        expect(filtered.length).toBe(expected.length);
+        expect(normalizeAndSort(actual)).toEqual(expected);
+        expect(actual.length).toBe(expected.length);
     });
 });

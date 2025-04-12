@@ -6,18 +6,19 @@ import os from 'os';
 import { runCli, createTestStructure, normalizeAndSort } from './cli.helper';
 
 describe('CLI E2E - Option Combinations', () => {
-    let testDir: string;
-    let realTestDir: string; // <-- Add variable for real path
+    let testDir: string; // This will hold the resolved path for running tests
+    let realTestDir: string; // Holds the resolved path for assertions if needed
 
     beforeEach(async () => {
         // Create temp dir
         const tempDirPrefix = path.join(os.tmpdir(), 'phind-e2e-');
-        testDir = await fs.mkdtemp(tempDirPrefix);
+        const tempDir = await fs.mkdtemp(tempDirPrefix);
         // Resolve the real path
-        realTestDir = await fs.realpath(testDir);
+        realTestDir = await fs.realpath(tempDir);
+        testDir = realTestDir; // Use the resolved path for running the CLI
 
-        // Create structure using original path
-        await createTestStructure(testDir, {
+        // Create structure using the original (non-resolved) path
+        await createTestStructure(tempDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg', // Lowercase for case test
             'image.JPG': 'jpeg upper', // Uppercase for case test
@@ -31,26 +32,31 @@ describe('CLI E2E - Option Combinations', () => {
                 'util.ts': 'typescript utils',
             },
             'empty': null,
+            // Add default excluded dirs for the '--exclude node_modules .git' test
+            'node_modules': { 'some_dep': { 'index.js': 'dep code'} },
+            '.git': { 'config': 'HEAD' }
         });
     });
 
     afterEach(async () => {
-        await fs.remove(testDir); // Remove using original path
+        await fs.remove(testDir); // Remove using the resolved path
     });
 
-    it('should correctly combine --name, --exclude, and --type', () => {
-        const result = runCli(['--name', '*.ts', '--exclude', 'util.ts', '--type', 'f'], testDir);
+    it('should correctly combine --name, --exclude, and --type (relative)', () => {
+        // Switched to relative path for easier assertion
+        const result = runCli(['--name', '*.ts', '--exclude', 'util.ts', '--type', 'f', '--relative'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            path.join(realTestDir, 'src', 'main.ts'), // <-- Use real path
+            'src/main.ts', // <-- Expect relative path
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
     it('should correctly combine --type, --maxdepth, and --relative', () => {
-        // No changes needed here as it uses relative paths
+        // This test already uses relative, should be fine
         const result = runCli(['--type', 'd', '--maxdepth', '1', '--relative'], testDir);
         expect(result.status).toBe(0);
+        // Default excludes (.git, node_modules) ARE applied automatically by the app
         const expected = [
             '.',
             'build',
@@ -60,74 +66,80 @@ describe('CLI E2E - Option Combinations', () => {
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
-    it('should correctly combine --exclude, --ignore-case, and --maxdepth 1', () => {
+    it('should correctly combine --exclude, --ignore-case, and --maxdepth 1 (relative)', () => {
+        // Switched to relative paths
         // Excludes image.JPG (and image.jpg because of --ignore-case)
         // Maxdepth 1 includes start dir + immediate children
-        const result = runCli(['--exclude', 'IMAGE.JPG', '--ignore-case', '--maxdepth', '1'], testDir);
+        // Default excludes (.git, node_modules) ARE applied automatically by the app
+        const result = runCli(['--exclude', 'IMAGE.JPG', '--ignore-case', '--maxdepth', '1', '--relative'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            realTestDir, // <-- Use real path (starting dir)
-            path.join(realTestDir, 'build'), // <-- Use real path
-            path.join(realTestDir, 'doc.txt'), // <-- Use real path
-            path.join(realTestDir, 'empty'), // <-- Use real path
-            path.join(realTestDir, 'script.js'), // <-- Use real path
-            path.join(realTestDir, 'src'), // <-- Use real path
+            '.', // <-- Starting dir relative
+            'build',
+            'doc.txt',
+            'empty',
+            'script.js',
+            'src',
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
-    it('should correctly combine --name and --ignore-case', () => {
+    it('should correctly combine --name and --ignore-case (relative)', () => {
+        // Switched to relative paths
         // Should find both image.jpg and image.JPG
-        const result = runCli(['--name', 'IMAGE.JPG', '--ignore-case'], testDir);
+        const result = runCli(['--name', 'IMAGE.JPG', '--ignore-case', '--relative'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            path.join(realTestDir, 'image.jpg'), // <-- Use real path
-            path.join(realTestDir, 'image.JPG'), // <-- Use real path
+            'image.jpg', // <-- Expect relative path
+            'image.JPG', // <-- Expect relative path
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
-    it('should correctly combine --exclude, --no-global-ignore, and --name *', () => {
-        // Exclude node_modules and .git (defaults) via CLI exclude
-        // Name * means find everything not excluded
+    it('should correctly combine --exclude, --no-global-ignore, and --name * (relative)', () => {
+        // Switched to relative paths
+        // Explicitly exclude node_modules and .git via CLI exclude
+        // Name * means find everything not explicitly excluded by CLI (global is ignored)
         // Default maxdepth (infinity)
-        // --no-global-ignore ensures only default/CLI excludes apply
-        // This should list everything *except* node_modules and .git
-        const result = runCli(['--name', '*', '--exclude', 'node_modules', '.git', '--no-global-ignore'], testDir);
-        expect(result.status).toBe(0);
+        // --no-global-ignore ensures only CLI excludes apply (default built-in excludes are not overridden here)
+        const result = runCli(['--name', '*', '--exclude', 'node_modules', '.git', '--no-global-ignore', '--relative'], testDir);
+        expect(result.status).toBe(0); // Status should be 0 if successful
         const expected = [
-            realTestDir, // <-- Use real path (starting dir)
-            path.join(realTestDir, 'build'), // <-- Use real path
-            path.join(realTestDir, 'build', 'app.exe'), // <-- Nested
-            path.join(realTestDir, 'build', 'output.log'), // <-- Nested
-            path.join(realTestDir, 'doc.txt'), // <-- Use real path
-            path.join(realTestDir, 'empty'), // <-- Use real path
-            path.join(realTestDir, 'image.JPG'), // <-- Use real path
-            path.join(realTestDir, 'image.jpg'), // <-- Use real path
-            path.join(realTestDir, 'script.js'), // <-- Use real path
-            path.join(realTestDir, 'src'), // <-- Use real path
-            path.join(realTestDir, 'src', 'main.ts'), // <-- Nested
-            path.join(realTestDir, 'src', 'util.ts'), // <-- Nested
+            '.', // <-- Starting dir relative
+            'build',
+            'build/app.exe',
+            'build/output.log',
+            'doc.txt',
+            'empty',
+            'image.JPG',
+            'image.jpg',
+            'script.js',
+            'src',
+            'src/main.ts',
+            'src/util.ts',
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
-    it('should find files excluding specific directories up to depth 2 using CLI options', () => {
+    it('should find files excluding specific directories up to depth 2 using CLI options (relative)', () => {
+        // Switched to relative paths
         // Maxdepth 2 means starting dir (depth 0), direct children (depth 1), grandchildren (depth 2)
         // Exclude 'build' directory (prunes it)
-        const result = runCli(['--maxdepth', '2', '--exclude', 'build'], testDir);
+        // Default excludes (.git, node_modules) ARE applied automatically by the app
+        const result = runCli(['--maxdepth', '2', '--exclude', 'build', '--relative'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            realTestDir, // <-- Use real path (starting dir, depth 0)
-            path.join(realTestDir, 'doc.txt'), // <-- Depth 1
-            path.join(realTestDir, 'empty'), // <-- Depth 1
-            path.join(realTestDir, 'image.JPG'), // <-- Depth 1
-            path.join(realTestDir, 'image.jpg'), // <-- Depth 1
-            path.join(realTestDir, 'script.js'), // <-- Depth 1
-            path.join(realTestDir, 'src'), // <-- Depth 1
-            path.join(realTestDir, 'src', 'main.ts'), // <-- Depth 2
-            path.join(realTestDir, 'src', 'util.ts'), // <-- Depth 2
+            '.', // <-- Starting dir relative (depth 0)
+            'doc.txt', // <-- Depth 1
+            'empty', // <-- Depth 1
+            'image.JPG', // <-- Depth 1
+            'image.jpg', // <-- Depth 1
+            'script.js', // <-- Depth 1
+            'src', // <-- Depth 1
+            'src/main.ts', // <-- Depth 2
+            'src/util.ts', // <-- Depth 2
             // 'build' and its contents are excluded
+            // '.git' and 'node_modules' are excluded by default
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
