@@ -2,7 +2,6 @@
   "name": "phind-cli",
   "version": "0.1.0",
   "description": "A cross-platform command-line tool to find files and directories (phind).",
-  "main": "./bin/index.js",
   "bin": {
     "phind": "./bin/cli.js"
   },
@@ -11,7 +10,7 @@
     "watch": "tsc -w",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build",
-    "start": "node dist/cli.js",
+    "start": "node bin/cli.js",
     "dev": "ts-node src/cli.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -41,7 +40,7 @@
     "node": ">=14.0.0"
   },
   "files": [
-    "dist/**/*",
+    "bin/**/*",
     "README.md",
     "LICENSE"
   ]
