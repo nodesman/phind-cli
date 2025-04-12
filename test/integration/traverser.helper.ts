@@ -100,18 +100,21 @@ export const runTraverse = async (
     consoleLogSpy: jest.SpyInstance,
     options: Partial<TraverseOptions> = {}
 ): Promise<string[]> => {
+    // Provide a sensible default for defaultExcludes *before* spreading options
     const defaultOptions: TraverseOptions = {
         includePatterns: ['*'],
-        excludePatterns: [], // Keep explicitly empty unless overridden
+        excludePatterns: [], // Keep explicitly empty unless overridden by options
         matchType: null,
         maxDepth: Number.MAX_SAFE_INTEGER,
         ignoreCase: false,
         relativePaths: false, // Default to absolute for base runner
-        ...options,
+        defaultExcludes: ['node_modules', '.git'], // <-- Add a default value here
+        ...options, // Spread options AFTER defaults, allowing tests to override them
     };
     const traverser = new DirectoryTraverser(defaultOptions, testDir);
     await traverser.traverse(testDir);
 
+    // Ensure you are using the correct relativePaths value for normalization
     return normalizeAndSort(consoleLogSpy.mock.calls, defaultOptions.relativePaths);
 };
 
@@ -121,5 +124,6 @@ export const runTraverseRelative = async (
     consoleLogSpy: jest.SpyInstance,
     options: Partial<TraverseOptions> = {}
 ): Promise<string[]> => {
+    // Ensure relativePaths: true is passed correctly
     return await runTraverse(testDir, consoleLogSpy, { ...options, relativePaths: true });
 };
