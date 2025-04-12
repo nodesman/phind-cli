@@ -9,7 +9,7 @@ import type { Dirent } from 'fs';
 export const testStructure = {
     'file1.txt': 'content1',
     'file2.log': 'content2',
-    'Capitals.TXT': 'case test', // Removed leading space
+    ' Capitals.TXT': 'case test', // Removed leading space
     '.hiddenfile': 'hidden content',
     '.hiddenDir': {
         'insideHidden.txt': 'hidden dir content',
@@ -35,8 +35,6 @@ export const testStructure = {
     'dir with spaces': { 'file inside spaces.txt': 'space content' },
     'unreadable_dir': {}
 };
-
-// ... rest of the helper file remains the same ...
 
 export async function createTestStructure(baseDir: string, structure: any): Promise<void> {
     for (const name in structure) {
@@ -79,8 +77,6 @@ export async function setupTestEnvironment(): Promise<{ testDir: string; console
 export async function cleanupTestEnvironment(testDir: string, spies: { consoleLogSpy: jest.SpyInstance; consoleErrorSpy: jest.SpyInstance }): Promise<void> {
     // Restore permissions first (might fail if test failed)
     try {
-        // Use the original (potentially unresolved) path reference if chmod needs it,
-        // although testDir passed in *should* be the resolved one from setup.
         await fs.chmod(path.join(testDir, 'unreadable_dir'), 0o755);
     } catch (e) { /* Ignore */ }
     await fs.remove(testDir);
@@ -89,29 +85,43 @@ export async function cleanupTestEnvironment(testDir: string, spies: { consoleLo
 }
 
 // Helper to normalize and sort output paths
-export const normalizeAndSort = (calls: any[][], relative: boolean, basePath?: string): string[] => {
-    // If relative is true, we need the basePath to correctly calculate relative paths
-    if (relative && !basePath) {
-        throw new Error("basePath is required for relative path normalization");
-    }
+// --- START FIX ---
+export const normalizeAndSort = (calls: any[][]): string[] => {
+    // The `calls` array contains the arguments passed to console.log.
+    // We assume call[0] is the path string logged by the traverser.
+    // The traverser ALREADY produced the correct relative/absolute path based on options.
+    // We just need to normalize separators and sort here.
     return calls
         .map(call => {
-            let p = path.normalize(call[0]);
-            if (relative && basePath) {
-                 // Calculate relative path from the provided base path
-                 p = path.relative(basePath, p);
-                 // Ensure consistent forward slashes for relative paths
-                 p = p.replace(/\\/g, '/');
-                 // If the path is the base path itself, represent it as '.'
-                 if (p === '') p = '.';
-            } else if (!relative) {
-                 // For absolute paths, just normalize separators for consistency if needed
-                 p = p.replace(/\\/g, '/');
+            let p = call[0]; // The path string logged by the traverser
+
+            // Check if p is a string before normalizing
+            if (typeof p !== 'string') {
+                // Handle cases where console.log might have been called with non-strings
+                // (e.g., during debugging), although it shouldn't happen in normal operation.
+                // You might want to return a placeholder, filter it out, or throw an error.
+                console.warn(`normalizeAndSort encountered non-string log: ${p}`);
+                return ''; // Return empty string or handle as appropriate
             }
+
+
+            // Normalize path separators etc.
+            p = path.normalize(p);
+            // Ensure consistent forward slashes for comparison across platforms
+            p = p.replace(/\\/g, '/');
+
+            // If the original path was empty string (e.g., from a relative calc), represent as '.'
+            // (The traverser should already be logging '.', but this is a safeguard)
+            if (p === '') {
+                return '.';
+            }
+
             return p;
         })
+        .filter(p => p !== '') // Filter out any empty strings from non-string logs
         .sort();
 };
+// --- END FIX ---
 
 
 // Runner function
@@ -138,16 +148,19 @@ export const runTraverse = async (
     const mergedOptions = { ...baseOptions, ...options };
 
     // Calculate effective excludes *like PhindConfig would*
+    // Combine defaults + specific excludes passed in test options
     const effectiveExcludes = [
         ...(mergedOptions.defaultExcludes || []), // Use the defaults specified in mergedOptions
         ...(options.excludePatterns || [])      // Add any *specific* exclude patterns from the test call
     ];
+    // Ensure unique excludes if needed (optional, but good practice)
+    const uniqueEffectiveExcludes = [...new Set(effectiveExcludes)];
 
     // Final options to pass to traverser
     const finalOptions: TraverseOptions = {
         ...mergedOptions,
-        excludePatterns: effectiveExcludes,
-        defaultExcludes: mergedOptions.defaultExcludes || [],
+        excludePatterns: uniqueEffectiveExcludes, // Use combined list
+        defaultExcludes: mergedOptions.defaultExcludes || [], // Keep original defaults for override logic
     };
 
     // Use the provided startPath to determine the basePath for the traverser instance.
@@ -159,11 +172,9 @@ export const runTraverse = async (
     // Start the actual traversal from the (potentially different) startPath
     await traverser.traverse(absoluteBasePath);
 
-    // Normalize based on the determined absoluteBasePath if paths are relative
-    const basePathForNormalization = finalOptions.relativePaths ? absoluteBasePath : undefined;
-    return normalizeAndSort(consoleLogSpy.mock.calls, finalOptions.relativePaths, basePathForNormalization);
+    // Normalize the results from the spy
+    return normalizeAndSort(consoleLogSpy.mock.calls); // No need to pass relative/basePath anymore
 };
-
 
 // Convenience runner for relative paths
 export const runTraverseRelative = async (
