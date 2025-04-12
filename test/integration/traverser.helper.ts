@@ -26,7 +26,8 @@ export const testStructure = {
     },
     'dir2': {
         'file5.log': 'content5',
-        'image.JPG': 'uppercase jpg',
+        // 'image.JPG': 'uppercase jpg', // <<< CHANGE THIS
+        'image_upper.JPG': 'uppercase jpg', // <<< TO THIS (unique name)
         'image.jpg': 'lowercase jpg' // Added missing file
     },
     '.git': { 'config': 'git config', 'HEAD': 'ref: refs/heads/main' },

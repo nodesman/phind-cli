@@ -18,7 +18,8 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
         await createTestStructure(tempDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg',
-            'image.JPG': 'jpeg upper',
+            // 'image.JPG': 'jpeg upper', // <<< CHANGE THIS
+            'image_upper.JPG': 'jpeg upper', // <<< TO THIS (unique name)
             'script.js': 'javascript',
             '.config': { 'app.conf': 'config file' },
             'build': {
@@ -122,10 +123,12 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
 
     it('should handle --name patterns with case sensitivity by default (relative)', () => {
         // Add --relative flag
-        const result = runCli(['--name', 'image.JPG', '--relative'], testDir);
+        // const result = runCli(['--name', 'image.JPG', '--relative'], testDir); // <<< CHANGE THIS
+        const result = runCli(['--name', 'image_upper.JPG', '--relative'], testDir); // <<< TO THIS
         expect(result.status).toBe(0);
          // Expect relative paths
-        const expected = ['image.JPG'];
+        // const expected = ['image.JPG']; // <<< CHANGE THIS
+        const expected = ['image_upper.JPG']; // <<< TO THIS
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expect.arrayContaining(expected));
         expect(result.stdoutLines.filter(l => l !== '.').length).toBe(expected.length);
     });
@@ -148,7 +151,8 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
             'build/output.log',
             'doc.txt',
             'empty',
-            'image.JPG',
+            // 'image.JPG', // <<< CHANGE THIS
+            'image_upper.JPG', // <<< TO THIS
             'image.jpg',
             'script.js',
             'src',

@@ -18,7 +18,8 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
         await createTestStructure(testDir, { // Create using original path
             'doc.txt': 'text',
             'image.jpg': 'jpeg',
-            'image.JPG': 'jpeg upper',
+            // 'image.JPG': 'jpeg upper', // <<< CHANGE THIS
+            'image_upper.JPG': 'jpeg upper', // <<< TO THIS (unique name)
             'script.js': 'javascript',
             'src': {
                 'main.ts': 'typescript',
@@ -37,11 +38,14 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
         // This test might fail if there's an underlying issue with case handling
         // in the code or environment, but the expectation itself is correct for -i.
         it('should perform case-insensitive matching for --name when -i is used', () => {
-            const result = runCli(['--name', 'image.jpg', '-i'], testDir);
+            // --- FIX: Use a pattern that matches both unique files with -i ---
+            // const result = runCli(['--name', 'image.jpg', '-i'], testDir); // <<< ORIGINAL
+            const result = runCli(['--name', '*.jpg', '-i'], testDir); // <<< FIXED PATTERN
             expect(result.status).toBe(0);
             // Use realTestDir for constructing expected absolute paths
             const expected = [
-                path.join(realTestDir, 'image.JPG'),
+                // path.join(realTestDir, 'image.JPG'), // <<< CHANGE THIS
+                path.join(realTestDir, 'image_upper.JPG'), // <<< TO THIS
                 path.join(realTestDir, 'image.jpg')
             ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
@@ -49,7 +53,8 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
 
         it('should perform case-insensitive matching for --exclude when -i is used', () => {
             // Run with --relative for simpler path checking, less prone to /var vs /private/var
-            const result = runCli(['--exclude', 'image.jpg', '-i', '--relative'], testDir);
+            // Use '*.jpg' pattern with -i to exclude both 'image.jpg' and 'image_upper.JPG'
+            const result = runCli(['--exclude', '*.jpg', '-i', '--relative'], testDir);
             expect(result.status).toBe(0);
             const expectedRelative = [
                 '.',
@@ -61,9 +66,9 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
             ].sort();
             // Compare relative paths
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expectedRelative);
-            // Check absolute paths are not included (using realTestDir for safety)
-            expect(result.stdoutLines.map(l => path.resolve(realTestDir, l))).not.toContain(path.join(realTestDir, 'image.JPG'));
-            expect(result.stdoutLines.map(l => path.resolve(realTestDir, l))).not.toContain(path.join(realTestDir, 'image.jpg'));
+            // Check that neither of the excluded files is present (relative check is sufficient here)
+            expect(result.stdoutLines).not.toContain('image.jpg');
+            expect(result.stdoutLines).not.toContain('image_upper.JPG');
         });
 
         it('should perform case-insensitive pruning for directories when -i is used', async () => {
@@ -71,6 +76,7 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
              const dirToPruneReal = path.join(realTestDir, 'CaSeSeNsItIvEdIr');
              await fs.ensureDir(dirToPruneOriginal);
              await fs.writeFile(path.join(dirToPruneOriginal, 'file.txt'), 'test');
+             // Use runCli with the original testDir path as cwd
              const result = runCli(['--exclude', 'casesensitive*', '-i'], testDir);
              expect(result.status).toBe(0);
              // Check the real absolute path is not included in the output
@@ -82,11 +88,13 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
     describe('Relative Paths (--relative, -r)', () => {
         // This test might fail if there's an underlying case issue in the code/env.
         it('should print absolute paths by default', () => {
+            // Use runCli with the original testDir path as cwd
             const result = runCli([], testDir);
             expect(result.status).toBe(0);
-            // Check using realTestDir
+            // Check using realTestDir for assertions
             expect(result.stdoutLines).toContain(path.join(realTestDir, 'doc.txt'));
-            expect(result.stdoutLines).toContain(path.join(realTestDir, 'image.JPG'));
+            // expect(result.stdoutLines).toContain(path.join(realTestDir, 'image.JPG')); // <<< CHANGE THIS
+            expect(result.stdoutLines).toContain(path.join(realTestDir, 'image_upper.JPG')); // <<< TO THIS
             // Verify the first line is not '.' (unless the base dir is the only result, unlikely here)
             if (result.stdoutLines.length > 1) {
                 expect(result.stdoutLines[0]).not.toBe('.');
@@ -97,16 +105,19 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
 
         // This test might fail if there's an underlying case issue in the code/env.
         it('should print paths relative to the starting directory when --relative is used', () => {
+             // Use runCli with the original testDir path as cwd
             const result = runCli(['--relative'], testDir);
             expect(result.status).toBe(0);
             // The first line should be '.' for the starting directory itself
             expect(result.stdoutLines).toContain('.');
             expect(result.stdoutLines).toContain('doc.txt');
-            expect(result.stdoutLines).toContain('image.JPG');
+            // expect(result.stdoutLines).toContain('image.JPG'); // <<< CHANGE THIS
+            expect(result.stdoutLines).toContain('image_upper.JPG'); // <<< TO THIS
             expect(result.stdoutLines).toContain('src/main.ts');
         });
 
         it('should print "." for the starting directory itself when --relative is used', () => {
+             // Use runCli with the original testDir path as cwd
             const result = runCli(['--relative'], testDir);
             expect(result.status).toBe(0);
             expect(result.stdoutLines).toContain('.');
@@ -116,6 +127,7 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
     describe('Help Option (--help, -h)', () => {
         // Use regex to be less sensitive to exact script name (cli.js vs phind) and localization
         it('should display help message when --help is used', () => {
+            // Use runCli with the original testDir path as cwd
             const result = runCli(['--help'], testDir);
             expect(result.status).toBe(0);
             expect(result.stdout).toMatch(/Usage: .*(phind|cli\.js) \[path] \[options]/);
@@ -124,6 +136,7 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
         });
 
         it('should display help message when -h is used', () => {
+            // Use runCli with the original testDir path as cwd
             const result = runCli(['-h'], testDir);
             expect(result.status).toBe(0);
             expect(result.stdout).toMatch(/Usage: .*(phind|cli\.js) \[path] \[options]/);
@@ -131,6 +144,7 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
         });
 
         it('should exit with status 0 after displaying help', () => {
+            // Use runCli with the original testDir path as cwd
             const result = runCli(['--help'], testDir);
             expect(result.status).toBe(0);
         });
@@ -140,11 +154,11 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
             const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'phind-e2e-empty-'));
             let result: ReturnType<typeof runCli>;
             try {
+                // Use runCli with the emptyDir path as cwd
                 result = runCli(['--help'], emptyDir);
             } finally {
                 fs.rmSync(emptyDir, { recursive: true, force: true }); // Clean up empty dir
             }
-
 
             expect(result.status).toBe(0);
             expect(result.stdout).toMatch(/Usage:/i);
@@ -154,8 +168,8 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
             expect(result.stdout.split('\n').length).toBeGreaterThan(5); // Help has multiple lines
         });
 
-
         it('should display default values and descriptions in help message', () => {
+            // Use runCli with the original testDir path as cwd
             const result = runCli(['--help'], testDir);
             expect(result.status).toBe(0);
             // Use regex, make spacing flexible (\s*), check for key parts
