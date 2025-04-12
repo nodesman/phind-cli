@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    /* Base Options: */
+    "target": "ES2016", // Target modern Node versions
+    "module": "CommonJS", // Standard module system for Node CLIs
+    "lib": ["ESNext"], // Include modern ES features
+    "skipLibCheck": true, // Speed up compilation
+
+    /* Output Structure: */
+    "outDir": "./bin", // Output directory for compiled JS
+    "rootDir": "./src", // Source directory for TS files
+
+    /* Strictness */
+    "strict": true, // Enable all strict type-checking options
+    "noImplicitAny": true, // Require explicit 'any' types
+    "strictNullChecks": true,
+
+    /* Module Resolution */
+    "moduleResolution": "node", // How modules get resolved (standard for Node)
+    "esModuleInterop": true, // Enables compatibility between CommonJS and ES Modules
+    "resolveJsonModule": true, // Allow importing JSON files
+
+    /* Advanced */
+    "forceConsistentCasingInFileNames": true, // Disallow inconsistently-cased references to the same file.
+    "sourceMap": true // Generate source maps for debugging
+  },
+  "include": ["src/**/*"], // Compile files in the src directory
+  "exclude": ["node_modules", "bin"] // Exclude these directories
+}

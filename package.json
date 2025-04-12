@@ -1,8 +1,48 @@
 {
+  "name": "phind-cli",
+  "version": "0.1.0",
+  "description": "A cross-platform command-line tool to find files and directories (phind).",
+  "main": "./bin/index.js",
+  "bin": {
+    "phind": "./bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build",
+    "start": "node dist/cli.js",
+    "dev": "ts-node src/cli.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "find",
+    "phind",
+    "cli",
+    "file",
+    "search",
+    "cross-platform",
+    "utility",
+    "typescript"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "dependencies": {
+    "micromatch": "^4.0.5",
+    "yargs": "^17.7.2"
+  },
   "devDependencies": {
-    "@types/micromatch": "^4.0.9",
-    "@types/node": "^22.14.1",
-    "@types/yargs": "^17.0.33",
-    "typescript": "^5.8.3"
-  }
+    "@types/micromatch": "^4.0.2",
+    "@types/node": "^18.0.0",
+    "@types/yargs": "^17.0.24",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ]
 }
