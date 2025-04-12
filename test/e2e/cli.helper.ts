@@ -38,7 +38,13 @@ export const runCli = (
 ): CliResult => {
     const cliPath = path.resolve(__dirname, '../../bin/cli.js');
 
-    const processEnv = { ...process.env, ...env };
+    // --- FIX START: Force locale to ensure consistent English output ---
+    const processEnv = {
+        ...process.env,
+        ...env,
+        LC_ALL: 'C' // Force POSIX/English locale
+    };
+    // --- FIX END ---
 
     const noGlobalIgnoreFlag = args.includes('--no-global-ignore');
 
@@ -56,10 +62,11 @@ export const runCli = (
         }
     }
 
+
     const result = spawn.sync(process.execPath, [cliPath, ...args], {
         cwd,
         encoding: 'utf-8',
-        env: processEnv,
+        env: processEnv, // Use the modified environment
     });
 
     const normalizeOutput = (output: string | null): string => (output || '').replace(/\r\n/g, '\n');
@@ -84,3 +91,4 @@ export const normalizeAndSort = (lines: string[]) => {
         .map(line => path.normalize(line).replace(/\\/g, '/')) // Normalize separators
         .sort();
 }
+```
