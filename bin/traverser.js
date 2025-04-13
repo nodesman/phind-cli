@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -256,88 +247,86 @@ class DirectoryTraverser {
         }
     } // End shouldPrintItem
     /** Main traversal method */
-    traverse(startPath_1) {
-        return __awaiter(this, arguments, void 0, function* (startPath, currentDepth = 0) {
-            const resolvedStartPath = path_1.default.resolve(startPath);
-            let canReadEntries = false;
-            let isStartDir = false;
-            if (currentDepth === 0) {
-                // Handle the starting path itself
-                try {
-                    const stats = yield promises_1.default.stat(resolvedStartPath);
-                    const isDirectory = stats.isDirectory();
-                    const isFile = stats.isFile();
-                    isStartDir = isDirectory;
-                    const dirName = path_1.default.basename(resolvedStartPath);
-                    const relativePathForStart = this.calculateRelativePath(resolvedStartPath);
-                    // Use resolvedStartPath for absolute, relativePathForStart for relative display
-                    const displayPath = this.options.relativePaths ? relativePathForStart : resolvedStartPath;
-                    // --- Rely on shouldPrintItem to handle the '.' case ---
-                    if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
-                        console.log(displayPath);
-                    }
-                    if (isDirectory) {
-                        canReadEntries = true;
-                    }
-                }
-                catch (err) {
-                    console.error(`Error accessing start path ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
-                    return;
-                }
-            }
-            else {
-                // We wouldn't be called at depth > 0 unless the parent was a directory
-                canReadEntries = true;
-            }
-            // Stop recursion checks
-            if (currentDepth >= this.options.maxDepth) {
-                return;
-            }
-            if (!canReadEntries) {
-                return;
-            }
-            // Read Directory Entries
-            let entries;
+    async traverse(startPath, currentDepth = 0) {
+        const resolvedStartPath = path_1.default.resolve(startPath);
+        let canReadEntries = false;
+        let isStartDir = false;
+        if (currentDepth === 0) {
+            // Handle the starting path itself
             try {
-                entries = yield promises_1.default.readdir(resolvedStartPath, { withFileTypes: true });
-            }
-            catch (err) {
-                // Log errors appropriately (avoid duplicate logging for start path)
-                if (currentDepth > 0 || !isStartDir) {
-                    if (err.code === 'EACCES' || err.code === 'EPERM') {
-                        console.error(`Permission error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
-                    }
-                    else {
-                        console.error(`Error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
-                    }
-                }
-                return; // Stop processing this directory on error
-            }
-            // Process Each Entry
-            for (const dirent of entries) {
-                const entryName = dirent.name;
-                const entryFullPath = path_1.default.join(resolvedStartPath, entryName);
-                const entryRelativePath = this.calculateRelativePath(entryFullPath);
-                const displayPath = this.options.relativePaths ? entryRelativePath : entryFullPath;
-                const isDirectory = dirent.isDirectory();
-                const isFile = dirent.isFile();
-                // --- Pruning Check ---
-                if (isDirectory && this.shouldPrune(entryName, entryFullPath, entryRelativePath)) {
-                    // console.log(`DEBUG: Pruning directory: ${displayPath}`);
-                    continue;
-                }
-                // --- Print Check ---
-                // Rely on shouldPrintItem to handle the '.' case correctly now
-                if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
+                const stats = await promises_1.default.stat(resolvedStartPath);
+                const isDirectory = stats.isDirectory();
+                const isFile = stats.isFile();
+                isStartDir = isDirectory;
+                const dirName = path_1.default.basename(resolvedStartPath);
+                const relativePathForStart = this.calculateRelativePath(resolvedStartPath);
+                // Use resolvedStartPath for absolute, relativePathForStart for relative display
+                const displayPath = this.options.relativePaths ? relativePathForStart : resolvedStartPath;
+                // --- Rely on shouldPrintItem to handle the '.' case ---
+                if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
                     console.log(displayPath);
                 }
-                // --- Recurse ---
                 if (isDirectory) {
-                    // Depth check for *next* level happens at the start of the recursive call
-                    yield this.traverse(entryFullPath, currentDepth + 1);
+                    canReadEntries = true;
                 }
             }
-        });
+            catch (err) {
+                console.error(`Error accessing start path ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
+                return;
+            }
+        }
+        else {
+            // We wouldn't be called at depth > 0 unless the parent was a directory
+            canReadEntries = true;
+        }
+        // Stop recursion checks
+        if (currentDepth >= this.options.maxDepth) {
+            return;
+        }
+        if (!canReadEntries) {
+            return;
+        }
+        // Read Directory Entries
+        let entries;
+        try {
+            entries = await promises_1.default.readdir(resolvedStartPath, { withFileTypes: true });
+        }
+        catch (err) {
+            // Log errors appropriately (avoid duplicate logging for start path)
+            if (currentDepth > 0 || !isStartDir) {
+                if (err.code === 'EACCES' || err.code === 'EPERM') {
+                    console.error(`Permission error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
+                }
+                else {
+                    console.error(`Error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
+                }
+            }
+            return; // Stop processing this directory on error
+        }
+        // Process Each Entry
+        for (const dirent of entries) {
+            const entryName = dirent.name;
+            const entryFullPath = path_1.default.join(resolvedStartPath, entryName);
+            const entryRelativePath = this.calculateRelativePath(entryFullPath);
+            const displayPath = this.options.relativePaths ? entryRelativePath : entryFullPath;
+            const isDirectory = dirent.isDirectory();
+            const isFile = dirent.isFile();
+            // --- Pruning Check ---
+            if (isDirectory && this.shouldPrune(entryName, entryFullPath, entryRelativePath)) {
+                // console.log(`DEBUG: Pruning directory: ${displayPath}`);
+                continue;
+            }
+            // --- Print Check ---
+            // Rely on shouldPrintItem to handle the '.' case correctly now
+            if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
+                console.log(displayPath);
+            }
+            // --- Recurse ---
+            if (isDirectory) {
+                // Depth check for *next* level happens at the start of the recursive call
+                await this.traverse(entryFullPath, currentDepth + 1);
+            }
+        }
     } // End traverse
 } // End class
 exports.DirectoryTraverser = DirectoryTraverser;

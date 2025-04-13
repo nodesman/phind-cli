@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -51,29 +42,27 @@ class PhindConfig {
     getGlobalIgnorePath() {
         return this.globalIgnorePath;
     }
-    loadGlobalIgnores() {
-        return __awaiter(this, arguments, void 0, function* (forceReload = false) {
-            if (!forceReload && this.globalIgnorePatterns.length > 0) {
-                return;
+    async loadGlobalIgnores(forceReload = false) {
+        if (!forceReload && this.globalIgnorePatterns.length > 0) {
+            return;
+        }
+        try {
+            const content = await promises_1.default.readFile(this.globalIgnorePath, 'utf-8');
+            this.globalIgnorePatterns = content
+                .split(/\r?\n/) // Split by newline
+                .map(line => line.split('#')[0].trim()) // Remove comments FIRST, then trim
+                .filter(line => line); // Ignore empty lines (implicitly ignores comment-only lines now)
+        }
+        catch (err) {
+            if (err.code === 'ENOENT') {
+                this.globalIgnorePatterns = [];
             }
-            try {
-                const content = yield promises_1.default.readFile(this.globalIgnorePath, 'utf-8');
-                this.globalIgnorePatterns = content
-                    .split(/\r?\n/) // Split by newline
-                    .map(line => line.split('#')[0].trim()) // Remove comments FIRST, then trim
-                    .filter(line => line); // Ignore empty lines (implicitly ignores comment-only lines now)
+            else {
+                console.warn(`Warning: Could not read global ignore file at ${this.globalIgnorePath}: ${err.message}`);
+                this.globalIgnorePatterns = [];
             }
-            catch (err) {
-                if (err.code === 'ENOENT') {
-                    this.globalIgnorePatterns = [];
-                }
-                else {
-                    console.warn(`Warning: Could not read global ignore file at ${this.globalIgnorePath}: ${err.message}`);
-                    this.globalIgnorePatterns = [];
-                }
-            }
-            this.combinedExcludePatterns = null; // Invalidate cache
-        });
+        }
+        this.combinedExcludePatterns = null; // Invalidate cache
     }
     setCliExcludes(cliExcludes) {
         this.cliExcludePatterns = cliExcludes;
