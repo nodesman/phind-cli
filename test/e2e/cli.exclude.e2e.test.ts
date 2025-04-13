@@ -200,6 +200,15 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             // Pass the relative path, but the flag should prevent its use
             const result = runCli(['--no-global-ignore', '--relative'], testDir, {}, relativeGlobalIgnorePath);
 
+            // --- BEGIN ADDED CHECKS ---
+            // Check for unexpected errors and non-zero exit code
+            if (result.status !== 0 || result.stderr) {
+                console.error(`Test failed unexpectedly:\nStatus: ${result.status}\nStderr:\n${result.stderr}\nStdout:\n${result.stdout}`);
+            }
+            expect(result.stderr).toBe(''); // Expect no errors printed to stderr
+            expect(result.status).toBe(0);  // Expect successful exit code
+            // --- END ADDED CHECKS ---
+
             // Global excludes should NOT be applied
             expect(result.stdoutLines).toContain('excluded.tmp');
             expect(result.stdoutLines).toContain('build');
@@ -211,6 +220,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
 
             // Other files should be present
             expect(result.stdoutLines).toContain('doc.txt');
+            // In relative mode, the starting directory itself should be listed as '.' if it matches filters
             expect(result.stdoutLines).toContain('.');
         });
 
