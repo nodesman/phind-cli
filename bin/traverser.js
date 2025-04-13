@@ -72,6 +72,13 @@ class DirectoryTraverser {
                     continue; // Skip to the next pattern
                 }
             }
+            // Special handling for '.' and '.*' include patterns
+            if (pattern === '.' && !this.options.relativePaths) {
+                continue; // Skip "." if relative paths are disabled
+            }
+            if (pattern === '.*' && name !== '.' && !name.startsWith('.')) {
+                continue; //If pattern is '.*' and name doesnt starts with '.'
+            }
             // Now check if *any* of the potentially filtered paths match the current pattern
             if (micromatch_1.default.some(currentPathsToTest, [pattern], this.baseMicromatchOptions)) {
                 return true; // Found a match with this pattern
@@ -133,7 +140,6 @@ class DirectoryTraverser {
         }
         // Override Check 2: Is this directory excluded *only* by a default pattern, AND
         // did the user provide *any* non-default include patterns?
-        // (Handles cases like exclude: ['node_modules'] (default), include: ['*.js'] or include: ['node_modules/pkg/index.js'])
         // If yes, we don't prune, allowing traversal to potentially find explicitly included descendants.
         const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, this.options.defaultExcludes);
         if (isExcludedByDefault) {
