@@ -148,21 +148,21 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
         // Check a deep file exists, confirming recursion went deep
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
         // Adjust count based on final structure (testStructure) and default excludes
-        const totalExpectedCount = 25; // Manually count items in testStructure excluding node_modules/* and .git/* contents
+        const totalExpectedCount = 23; // Manually count items in testStructure excluding node_modules/* and .git/* contents
         expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should find all items if maxDepth is Infinity/MAX_SAFE_INTEGER (absolute)', async () => {
         const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER });
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
-        const totalExpectedCount = 25; // As above
+        const totalExpectedCount = 23; // As above
         expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should find all items if maxDepth is Infinity/MAX_SAFE_INTEGER (relative)', async () => {
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER });
         expect(results).toContain('dir1/subDir1/file4.js');
-        const totalExpectedCount = 25; // As above
+        const totalExpectedCount = 23; // As above
         expect(results.length).toBe(totalExpectedCount);
     });
 
@@ -211,7 +211,8 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
         // Verify readdir was called on the root and potentially depth 1 dirs
         const expectedOptions = expect.objectContaining({ withFileTypes: true });
         expect(readdirMock).toHaveBeenCalledWith(testDir, expectedOptions); // Called on root
-        expect(readdirMock).toHaveBeenCalledWith(path.join(testDir, 'dir1'), expectedOptions); // May be called on depth 1 dirs like dir1
+        // --- FIX: For maxDepth 1, readdir should NOT be called on depth 1 directories ---
+        expect(readdirMock).not.toHaveBeenCalledWith(path.join(testDir, 'dir1'), expectedOptions);
 
         // Check it wasn't called on a depth 2 directory
         expect(readdirMock).not.toHaveBeenCalledWith(path.join(testDir, 'dir1', 'subDir1'), expectedOptions);

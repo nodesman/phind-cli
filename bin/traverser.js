@@ -101,44 +101,45 @@ class DirectoryTraverser {
     }
     /**
      * Checks if a directory should be pruned (i.e., not traversed into).
-     * Prune if it matches an exclude pattern UNLESS it specifically matches
-     * an explicit (non-'*', non-'.*') include pattern OR an explicit include
-     * pattern looks like it targets descendants.
+     * Prune if it matches an exclude pattern UNLESS an explicit include overrides it.
      */
     shouldPrune(name, fullPath, relativePath) {
-        // 1. Check if excluded by any pattern (default, global, cli)
+        // 1. Check if excluded by any pattern
         const isExcluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns);
         if (!isExcluded) {
             return false; // Not excluded, definitely don't prune
         }
-        // 2. If excluded, check if an *explicit* include pattern overrides the exclusion.
-        const explicitIncludes = this.getExplicitIncludePatternsForOverride(); // Gets specific includes
+        // --- START Refined Override Logic ---
+        // 2. Determine if the exclusion is *only* due to a default pattern
+        // It matches a default exclude AND does NOT match any non-default exclude pattern.
+        const nonDefaultExcludePatterns = this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p));
+        const matchesDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet));
+        const matchesNonDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, nonDefaultExcludePatterns);
+        const isExcludedByDefaultOnly = matchesDefaultExclude && !matchesNonDefaultExclude;
+        // 3. Check for explicit includes to potentially override the exclusion
+        const explicitIncludes = this.getExplicitIncludePatternsForOverride();
+        if (isExcludedByDefaultOnly && explicitIncludes.length > 0) {
+            // If excluded *only* by a default pattern, and explicit includes exist,
+            // we should NOT prune. Let traversal continue so shouldPrintItem can check descendants
+            // or print this item if it also matches an explicit include.
+            // console.log(`DEBUG: Not pruning "${name}" (excluded by default, but override applies because explicit includes exist)`);
+            return false; // DO NOT PRUNE
+        }
+        // 4. Check if the directory ITSELF is explicitly included (this handles cases where
+        // an item might be excluded by a non-default pattern, but explicitly included).
+        // This needs to be checked *after* the default-only override, as explicit includes
+        // should always win.
         if (explicitIncludes.length > 0) {
-            // --- FIX START: Refined check for explicit include override ---
-            // Check if the directory ITSELF is explicitly included
             const isDirExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
             if (isDirExplicitlyIncluded) {
                 // console.log(`DEBUG: Not pruning "${name}" because it is explicitly included.`);
                 return false; // Directory itself matches an explicit include - DO NOT prune
             }
-            // Heuristic: Check if any explicit include pattern *might* target descendants
-            // If a pattern contains separators or globstars, assume it could match deeper.
-            const mightIncludeDescendants = explicitIncludes.some(p => p.includes('/') || p.includes('**'));
-            if (mightIncludeDescendants) {
-                // Check if the *reason* for exclusion was a default exclude. If so, and an
-                // explicit include might match descendants, don't prune yet. Let shouldPrintItem handle filtering later.
-                const isExcludedByDefaultOnly = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet)) &&
-                    !this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p)));
-                if (isExcludedByDefaultOnly) {
-                    // console.log(`DEBUG: Not pruning "${name}" (default exclude) because explicit includes might match descendants.`);
-                    return false; // Don't prune default excludes if descendant includes exist
-                }
-            }
-            // --- FIX END ---
         }
-        // 3. If excluded and not overridden by the logic above, then prune
+        // --- END Refined Override Logic ---
+        // 5. If excluded and not overridden by the logic above, then prune
         // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly included or overridden.`);
-        return true;
+        return true; // PRUNE
     }
     /**
      * Checks if an item (file or directory) should be printed based on all filters.
@@ -155,9 +156,7 @@ class DirectoryTraverser {
         // 2. Include Check: Item must match at least one include pattern.
         const isIncluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.includePatterns);
         if (!isIncluded) {
-            // If the item itself isn't included, don't print it, even if it's a parent of an included item.
-            // The pruning logic should have already prevented skipping this directory if a child was included.
-            return false;
+            return false; // Not included, definitely don't print
         }
         // 3. Exclude Check: Check against the combined exclude patterns.
         const isExcluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns);
@@ -165,27 +164,32 @@ class DirectoryTraverser {
             return true; // Included and not excluded - PRINT
         }
         // --- Item IS excluded. Now check for override ---
-        // Is the exclusion *only* because of a default pattern?
-        const isExcludedByDefaultOnly = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet)) &&
-            !this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p)) // Excludes NOT in the default set
-            );
-        if (isExcludedByDefaultOnly) {
-            // Get the specific (non-'*', non-'.*', non-'**') include patterns
-            const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-            // *** --- START REVISED OVERRIDE LOGIC --- ***
-            // If the exclusion was *only* due to a default pattern,
-            // and there are *any* explicit includes provided by the user
-            // (which might match this item or its descendants), then the
-            // default exclusion is overridden for *this specific item*.
-            // The `shouldPrune` logic already determined that traversal
-            // should continue based on potential descendant matches.
-            if (explicitIncludes.length > 0) {
-                // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies because explicit includes exist)`);
-                return true; // Override the default exclusion for printing this item.
-            }
-            // *** --- END REVISED OVERRIDE LOGIC --- ***
-            // If no explicit includes were provided, the default exclusion remains in effect for this item.
+        // --- START Refined Override Logic ---
+        // 4. Determine if the exclusion is *only* because of a default pattern
+        const nonDefaultExcludePatterns = this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p));
+        const matchesDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet));
+        const matchesNonDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, nonDefaultExcludePatterns);
+        const isExcludedByDefaultOnly = matchesDefaultExclude && !matchesNonDefaultExclude;
+        // 5. Check for explicit includes to potentially override the exclusion
+        const explicitIncludes = this.getExplicitIncludePatternsForOverride();
+        if (isExcludedByDefaultOnly && explicitIncludes.length > 0) {
+            // If excluded *only* by a default pattern, and explicit includes exist,
+            // the default exclusion is overridden for printing this item.
+            // The `shouldPrune` logic already ensured traversal continued if necessary.
+            // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies because explicit includes exist)`);
+            return true; // Override the default exclusion - PRINT
         }
+        // 6. Check if the item ITSELF is explicitly included (handles cases where
+        // an item might be excluded by a non-default pattern, but explicitly included).
+        // This needs to be checked *after* the default-only override.
+        if (explicitIncludes.length > 0) {
+            const isItemExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
+            if (isItemExplicitlyIncluded) {
+                // console.log(`DEBUG: Printing "${name}" because it is explicitly included (overriding non-default exclude).`);
+                return true; // Item itself matches an explicit include - PRINT
+            }
+        }
+        // --- END Refined Override Logic ---
         // --- If we reach here: Item is excluded, and override conditions were not met.
         // console.log(`DEBUG: Not printing "${name}" (excluded: ${isExcluded}, byDefaultOnly: ${isExcludedByDefaultOnly}, override check failed)`);
         return false; // Excluded - DO NOT PRINT
