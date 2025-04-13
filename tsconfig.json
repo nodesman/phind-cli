@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     /* Base Options: */
-    "target": "ES2016", // Target modern Node versions
+    "target": "ES2020", // Target modern Node versions
     "module": "CommonJS", // Standard module system for Node CLIs
     "lib": ["ESNext"], // Include modern ES features
     "skipLibCheck": true, // Speed up compilation

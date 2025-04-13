@@ -176,12 +176,13 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
             // --- FIX: Adjust regex patterns to match yargs output ---
             // Use regex, make spacing flexible (\s*), check for key parts
             // Use \s+ for flexible whitespace matching
-            expect(result.stdout).toMatch(/--name\s+.*Glob pattern\(s\).*\s+\[array]\s+\[default: "\*" \(all files\/dirs\)\]/);
-            expect(result.stdout).toMatch(/--exclude\s+.*Glob pattern\(s\).*\s+\[array]\s+\[default: "node_modules", ".git"\]/);
-            expect(result.stdout).toMatch(/--maxdepth\s+.*Maximum directory levels.*\s+\[number]\s+\[default: Infinity]/);
-            expect(result.stdout).toMatch(/--relative\s+.*Print paths relative.*\s+\[boolean]\s+\[default: false]/);
-            expect(result.stdout).toMatch(/--ignore-case\s+.*case-insensitive matching.*\s+\[boolean]\s+\[default: false]/);
-            expect(result.stdout).toMatch(/--type\s+.*Match only files \(f\) or directories \(d\).*\s+\[string]\s+\[choices: "f", "d"]/);
+            // Add 's' flag (dotall) to make '.' match newlines for multi-line descriptions
+            expect(result.stdout).toMatch(/--name\s+.*Glob pattern\(s\).*\[array].*\[default: "\*" \(all files\/dirs\)\]/s);
+            expect(result.stdout).toMatch(/--exclude\s+.*Glob pattern\(s\).*\[array].*\[default: "node_modules", ".git"\]/s);
+            expect(result.stdout).toMatch(/--maxdepth\s+.*Maximum directory levels.*\[number].*\[default: Infinity]/s);
+            expect(result.stdout).toMatch(/--relative\s+.*Print paths relative.*\[boolean].*\[default: false]/s);
+            expect(result.stdout).toMatch(/--ignore-case\s+.*case-insensitive matching.*\[boolean].*\[default: false]/s);
+            expect(result.stdout).toMatch(/--type\s+.*Match only files \(f\) or directories \(d\).*\[string].*\[choices: "f", "d"]/s);
             // --- END FIX ---
         });
     });
