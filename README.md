@@ -22,6 +22,8 @@ The standard `find` command, while powerful, presents several challenges, especi
 
 3.  **Lack of Sensible Defaults for Developers:**
     *   **This is a major pain point.** When searching in a typical software project, you almost *never* want to see results from `node_modules`, `.git`, `build` directories, etc. Standard `find` requires you to *explicitly* exclude these *every single time*. This adds significant boilerplate to common search commands.
+4.  **No User-Level Configuration:**
+    *   Beyond project-specific ignores (like `.gitignore`, which `find` doesn't natively understand anyway), there's no standard way to tell `find` to *always* ignore certain patterns across *all* projects. Think about system files (`.DS_Store`, `Thumbs.db`), editor configuration (`.vscode/`, `.idea/`), temporary files (`*.bak`, `*.swp`), or compiled artifacts (`*.pyc`, `*.o`). With standard `find`, you must *manually add exclusion flags for these user-specific or system-specific nuisances every single time you run a command*, or resort to complex shell aliases or wrapper scripts.
 
 ## The Solution: `phind`
 
