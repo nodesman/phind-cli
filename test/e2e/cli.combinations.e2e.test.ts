@@ -108,14 +108,16 @@ describe('CLI E2E - Option Combinations', () => {
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
-    it('should correctly combine --exclude, --no-global-ignore, and --name * (relative)', () => {
+    it('should correctly combine --exclude, --skip-global-ignore, and --name * (relative)', () => {
         // Switched to relative paths
         // Explicitly exclude node_modules and .git via CLI exclude
         // Name * means find everything not explicitly excluded by CLI (global is ignored)
         // Default maxdepth (infinity)
-        // --no-global-ignore ensures only CLI excludes apply (default built-in excludes are not overridden here)
+        // --skip-global-ignore ensures only CLI excludes apply (default built-in excludes are not overridden here)
         // Repeat --exclude for each value for correct yargs parsing
-        const result = runCli(['--name', '*', '--exclude', 'node_modules', '--exclude', '.git', '--no-global-ignore', '--relative'], testDir);
+        // --- UPDATE FLAG ---
+        const result = runCli(['--name', '*', '--exclude', 'node_modules', '--exclude', '.git', '--skip-global-ignore', '--relative'], testDir);
+        // --- END UPDATE ---
 
         // Removed conditional console.error as the helper logic should be fixed
         expect(result.status).toBe(0); // Status should be 0 if successful (assuming cli.helper.ts fix)

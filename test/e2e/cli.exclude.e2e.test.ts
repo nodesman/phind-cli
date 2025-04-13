@@ -174,7 +174,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
         });
     });
 
-    describe('Global Ignore File (--no-global-ignore)', () => {
+    describe('Global Ignore File (--skip-global-ignore)', () => { // Updated description
         // Helper to write the fake global ignore file
         const ensureGlobalIgnoreFile = async (content: string) => {
              await fs.ensureDir(path.dirname(absoluteGlobalIgnorePath));
@@ -204,15 +204,15 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             expect(result.stdoutLines).toContain('.');
         });
 
-        it('should NOT load global ignores when --no-global-ignore is specified (relative)', async () => {
+        it('should NOT load global ignores when --skip-global-ignore is specified (relative)', async () => { // Updated description
             await ensureGlobalIgnoreFile('*.tmp\nbuild'); // Define global excludes
 
-            // --- FIX START: Remove the last argument (relativeGlobalIgnorePath) ---
-            // Since --no-global-ignore is used, the helper shouldn't need the path,
+            // Since --skip-global-ignore is used, the helper shouldn't need the path,
             // and passing it might confuse the test setup or helper internally if there's a subtle bug.
             // The core logic is testing the flag's effect, not the helper's handling of the path when the flag is set.
-            const result = runCli(['--no-global-ignore', '--relative'], testDir, {});
-            // --- FIX END ---
+            // --- UPDATE FLAG and keep fix from previous analysis ---
+            const result = runCli(['--skip-global-ignore', '--relative'], testDir, {});
+            // --- END UPDATE ---
 
 
             // --- BEGIN Original Checks (should now pass) ---

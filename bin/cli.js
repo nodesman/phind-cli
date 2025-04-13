@@ -41,11 +41,11 @@ class PhindApp {
             type: 'string',
             array: true,
             // Updated description to reference config method for clarity
-            description: `Glob pattern(s) to exclude. Also reads from ${this.config.getGlobalIgnorePath()} unless --no-global-ignore is used.`,
+            description: `Glob pattern(s) to exclude. Also reads from ${this.config.getGlobalIgnorePath()} unless --skip-global-ignore is used.`,
             default: [], // Defaults are now handled by PhindConfig
             defaultDescription: this.config.getDefaultExcludesDescription(), // Get defaults description from config
         })
-            .option('no-global-ignore', {
+            .option('skip-global-ignore', {
             type: 'boolean',
             description: 'Do not load patterns from the global ignore file.',
             default: false,
@@ -112,7 +112,7 @@ class PhindApp {
         try {
             const argv = await this.parseArguments();
             // Load global ignores if not disabled
-            if (!argv.noGlobalIgnore) {
+            if (!argv.skipGlobalIgnore) { // Updated flag check
                 // Use forceReload=false (default) unless needed
                 await this.config.loadGlobalIgnores();
             }

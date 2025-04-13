@@ -38,22 +38,23 @@ export const runCli = (
 ): CliResult => {
     const cliPath = path.resolve(__dirname, '../../bin/cli.js');
 
+    // --- UPDATE FLAG CHECK ---
+    const skipGlobalIgnoreFlag = args.includes('--skip-global-ignore');
+
     const processEnv: NodeJS.ProcessEnv = {
         ...process.env,
         ...env,
         LC_ALL: 'C' // Force POSIX/English locale
     };
 
-    // --- FIX START: Correct environment variable logic ---
-    const noGlobalIgnoreFlag = args.includes('--no-global-ignore');
-
-    if (noGlobalIgnoreFlag) {
-        // If --no-global-ignore is passed, the env var MUST be unset,
+    if (skipGlobalIgnoreFlag) {
+    // --- END UPDATE ---
+        // If --skip-global-ignore is passed, the env var MUST be unset,
         // regardless of the globalIgnorePath argument to runCli.
         // Using delete is more robust than setting to undefined here.
         delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
     } else {
-        // Only set the env var if --no-global-ignore is NOT present
+        // Only set the env var if --skip-global-ignore is NOT present
         if (globalIgnorePath === null) {
              // Explicitly unset if null is passed (and no flag)
              delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
