@@ -82,21 +82,22 @@ class DirectoryTraverser {
      * Excludes broad patterns like '*' and '.*' which shouldn't override defaults.
      */
     getExplicitIncludePatternsForOverride() {
-        // --- FIX: Filter out broad patterns ---
+        // Filter out broad patterns that shouldn't override specific default excludes
         const specificNonDefaultIncludes = this.nonDefaultIncludePatterns.filter(p => p !== '*' && p !== '.*' && p !== '**');
         if (specificNonDefaultIncludes.length === 0) {
             return [];
         }
-        // --- FIX END ---
         const derivedPatterns = specificNonDefaultIncludes.map(p => {
-            // ... (rest of derived pattern logic remains the same)
             if (p.endsWith('/**'))
                 return p.substring(0, p.length - 3);
             if (p.endsWith('/'))
                 return p.substring(0, p.length - 1);
+            // Also consider the pattern itself if it doesn't end with /** or /
+            // E.g., 'node_modules' should match the directory 'node_modules'
+            // This is already covered by including specificNonDefaultIncludes below
             return null;
-        }).filter((p) => p !== null); // Filter out nulls and ensure type string
-        // Combine specific original non-default patterns with derived patterns
+        }).filter((p) => p !== null);
+        // Combine specific original non-default patterns with derived patterns for directory name matching
         return [...new Set([...specificNonDefaultIncludes, ...derivedPatterns])];
     }
     /**
@@ -109,37 +110,18 @@ class DirectoryTraverser {
         if (!isExcluded) {
             return false; // Not excluded, definitely don't prune
         }
-        // --- START Refined Override Logic ---
-        // 2. Determine if the exclusion is *only* due to a default pattern
-        // It matches a default exclude AND does NOT match any non-default exclude pattern.
-        const nonDefaultExcludePatterns = this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p));
-        const matchesDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet));
-        const matchesNonDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, nonDefaultExcludePatterns);
-        const isExcludedByDefaultOnly = matchesDefaultExclude && !matchesNonDefaultExclude;
-        // 3. Check for explicit includes to potentially override the exclusion
+        // --- Item IS excluded. Check if an explicit include pattern overrides this exclusion. ---
         const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-        if (isExcludedByDefaultOnly && explicitIncludes.length > 0) {
-            // If excluded *only* by a default pattern, and explicit includes exist,
-            // we should NOT prune. Let traversal continue so shouldPrintItem can check descendants
-            // or print this item if it also matches an explicit include.
-            // console.log(`DEBUG: Not pruning "${name}" (excluded by default, but override applies because explicit includes exist)`);
-            return false; // DO NOT PRUNE
-        }
-        // 4. Check if the directory ITSELF is explicitly included (this handles cases where
-        // an item might be excluded by a non-default pattern, but explicitly included).
-        // This needs to be checked *after* the default-only override, as explicit includes
-        // should always win.
         if (explicitIncludes.length > 0) {
-            const isDirExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-            if (isDirExplicitlyIncluded) {
-                // console.log(`DEBUG: Not pruning "${name}" because it is explicitly included.`);
-                return false; // Directory itself matches an explicit include - DO NOT prune
+            const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
+            if (isExplicitlyIncluded) {
+                // console.log(`DEBUG: Not pruning "${name}" because it is explicitly included (overriding exclusion).`);
+                return false; // Explicitly included, DO NOT prune
             }
         }
-        // --- END Refined Override Logic ---
-        // 5. If excluded and not overridden by the logic above, then prune
-        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly included or overridden.`);
-        return true; // PRUNE
+        // --- If we reach here, it's excluded and NOT explicitly included. PRUNE. ---
+        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly included.`);
+        return true;
     }
     /**
      * Checks if an item (file or directory) should be printed based on all filters.
@@ -163,36 +145,18 @@ class DirectoryTraverser {
         if (!isExcluded) {
             return true; // Included and not excluded - PRINT
         }
-        // --- Item IS excluded. Now check for override ---
-        // --- START Refined Override Logic ---
-        // 4. Determine if the exclusion is *only* because of a default pattern
-        const nonDefaultExcludePatterns = this.options.excludePatterns.filter(p => !this.defaultExcludesSet.has(p));
-        const matchesDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, Array.from(this.defaultExcludesSet));
-        const matchesNonDefaultExclude = this.matchesAnyPattern(name, fullPath, relativePath, nonDefaultExcludePatterns);
-        const isExcludedByDefaultOnly = matchesDefaultExclude && !matchesNonDefaultExclude;
-        // 5. Check for explicit includes to potentially override the exclusion
+        // --- Item IS included AND excluded. Check for explicit include override ---
         const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-        if (isExcludedByDefaultOnly && explicitIncludes.length > 0) {
-            // If excluded *only* by a default pattern, and explicit includes exist,
-            // the default exclusion is overridden for printing this item.
-            // The `shouldPrune` logic already ensured traversal continued if necessary.
-            // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies because explicit includes exist)`);
-            return true; // Override the default exclusion - PRINT
-        }
-        // 6. Check if the item ITSELF is explicitly included (handles cases where
-        // an item might be excluded by a non-default pattern, but explicitly included).
-        // This needs to be checked *after* the default-only override.
         if (explicitIncludes.length > 0) {
-            const isItemExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-            if (isItemExplicitlyIncluded) {
-                // console.log(`DEBUG: Printing "${name}" because it is explicitly included (overriding non-default exclude).`);
-                return true; // Item itself matches an explicit include - PRINT
+            const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
+            if (isExplicitlyIncluded) {
+                // console.log(`DEBUG: Printing "${name}" because it is explicitly included (overriding exclusion).`);
+                return true; // Explicitly included, override the exclusion - PRINT
             }
         }
-        // --- END Refined Override Logic ---
-        // --- If we reach here: Item is excluded, and override conditions were not met.
-        // console.log(`DEBUG: Not printing "${name}" (excluded: ${isExcluded}, byDefaultOnly: ${isExcludedByDefaultOnly}, override check failed)`);
-        return false; // Excluded - DO NOT PRINT
+        // --- If we reach here: Item matched an include, matched an exclude, but did NOT match an *explicit* include.
+        // console.log(`DEBUG: Not printing "${name}" (included, but excluded, and not explicitly included to override).`);
+        return false; // Excluded and not overridden - DO NOT PRINT
     }
     traverse(startPath_1) {
         return __awaiter(this, arguments, void 0, function* (startPath, currentDepth = 0) {
