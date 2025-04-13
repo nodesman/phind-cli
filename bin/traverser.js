@@ -165,26 +165,32 @@ class DirectoryTraverser {
         // 2. Include Check: Item must match at least one include pattern.
         const isIncluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.includePatterns);
         if (!isIncluded) {
+            // console.log(`DEBUG: Not printing "${name}" (doesn't match includes)`);
             return false; // Not included, definitely don't print
         }
         // 3. Exclude Check: Check against the combined exclude patterns.
         const isExcluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns);
-        if (!isExcluded) {
-            return true; // Included and not excluded - PRINT
-        }
-        // --- Item IS included AND excluded. Check for explicit include override ---
-        const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-        if (explicitIncludes.length > 0) {
-            const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-            if (isExplicitlyIncluded) {
-                // console.log(`DEBUG: Printing "${name}" because it is explicitly included (overriding exclusion).`);
-                return true; // Explicitly included, override the exclusion - PRINT
+        // --- Decision Logic ---
+        if (isExcluded) {
+            // Item is excluded. Should we override the exclusion with an explicit include?
+            // This typically applies to overriding *default* excludes like node_modules.
+            const explicitIncludes = this.getExplicitIncludePatternsForOverride();
+            if (explicitIncludes.length > 0) {
+                const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
+                if (isExplicitlyIncluded) {
+                    // console.log(`DEBUG: Printing "${name}" because it is explicitly included (overriding exclusion).`);
+                    return true; // Explicitly included, override the exclusion - PRINT
+                }
             }
+            // console.log(`DEBUG: Not printing "${name}" (included, but excluded, and not explicitly included to override).`);
+            return false; // Excluded and not overridden by an explicit include - DO NOT PRINT
         }
-        // --- If we reach here: Item matched an include, matched an exclude, but did NOT match an *explicit* include.
-        // console.log(`DEBUG: Not printing "${name}" (included, but excluded, and not explicitly included to override).`);
-        return false; // Excluded and not overridden - DO NOT PRINT
-    }
+        else {
+            // Item is included and not excluded - PRINT
+            // console.log(`DEBUG: Printing "${name}" (included and not excluded).`);
+            return true;
+        }
+    } // End shouldPrintItem
     traverse(startPath_1) {
         return __awaiter(this, arguments, void 0, function* (startPath, currentDepth = 0) {
             const resolvedStartPath = path_1.default.resolve(startPath); // Ensure start path is absolute
