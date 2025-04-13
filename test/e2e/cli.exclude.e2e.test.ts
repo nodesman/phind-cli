@@ -64,9 +64,10 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
 
         it('should include node_modules if explicitly included via --name (and default exclude is bypassed by specific include)', () => {
             // Run with relative paths for simpler assertion
-             const result = runCli(['--name', 'node_modules/**', '--relative'], testDir);
-             const expectedRelative = [
-                 'node_modules',
+            // Use --name 'node_modules/**' - expects contents, NOT the directory itself based on standard glob interpretation
+            const result = runCli(['--name', 'node_modules/**', '--relative'], testDir);
+            const expectedRelative = [
+                 // 'node_modules', // <<< Should NOT be included by 'node_modules/**'
                  'node_modules/package',
                  'node_modules/package/index.js'
                 ].sort();
@@ -74,21 +75,28 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
              const receivedNormalized = normalizeAndSort(result.stdoutLines);
              expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
              expect(receivedNormalized).toContain('node_modules/package/index.js');
-             expect(receivedNormalized).toContain('node_modules'); // The directory itself should also match '**'
+             // --- FIX: Assertion reflects standard glob behavior ---
+             expect(receivedNormalized).not.toContain('node_modules'); // The directory itself should not match '**'
+             // --- END FIX ---
+             expect(receivedNormalized.length).toBe(expectedRelative.length); // Ensure no extra items
         });
 
         it('should include .git if explicitly included via --name (and default exclude is bypassed by specific include)', () => {
              // Run with relative paths for simpler assertion
+             // Use --name '.git/**' - expects contents, NOT the directory itself
              const result = runCli(['--name', '.git/**', '--relative'], testDir);
              const expectedRelative = [
-                 '.git',
+                 // '.git', // <<< Should NOT be included by '.git/**'
                  '.git/HEAD'
                 ].sort();
              // Use normalizeAndSort which handles path separators
              const receivedNormalized = normalizeAndSort(result.stdoutLines);
              expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
-             expect(receivedNormalized).toContain('.git');
              expect(receivedNormalized).toContain('.git/HEAD');
+             // --- FIX: Assertion reflects standard glob behavior ---
+             expect(receivedNormalized).not.toContain('.git'); // The directory itself should not match '**'
+             // --- END FIX ---
+             expect(receivedNormalized.length).toBe(expectedRelative.length); // Ensure no extra items
         });
     });
 

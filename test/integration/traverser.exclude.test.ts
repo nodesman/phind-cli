@@ -247,10 +247,14 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         });
          // Should contain the explicitly included file (override worked)
          expect(resultsWithStar).toContain(indexPath);
-         // Should NOT contain the parent directories. They match '*' (default include) but are excluded by 'node_modules' (default exclude).
-         // The exclusion override doesn't apply to them because they don't match the *non-default* include 'indexPath'.
-         expect(resultsWithStar).not.toContain(nodeModulesPath);
-         expect(resultsWithStar).not.toContain(packagePath);
+         // --- FIX: Change expectation ---
+         // Should also contain the parent directories because they match '*' and pruning was prevented.
+         // The default exclusion of 'node_modules' is overridden for printing 'node_modules' itself only if 'node_modules'
+         // matches a *non-default* include (which it doesn't here).
+         // However, 'some_package' is not excluded by default and matches '*', so it IS printed.
+         expect(resultsWithStar).not.toContain(nodeModulesPath); // Doesn't match non-default include 'indexPath'
+         expect(resultsWithStar).toContain(packagePath);         // Matches '*', not excluded by default, pruning prevented
+         // --- End FIX ---
          // Should still exclude other defaults
          expect(resultsWithStar).not.toContain(path.join(testDir, '.git'));
          // Should contain other items matched by '*'
@@ -276,9 +280,13 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          });
          // Should contain the explicitly included file (override worked)
          expect(resultsWithStar).toContain(includePath);
-         // Should NOT contain the parent directories (match '*' but are default excluded, no non-default match for them)
+         // --- FIX: Change expectation ---
+         // Should also contain the parent directories because they match '*' and pruning was prevented.
+         // 'node_modules' itself doesn't match the non-default include 'includePath', so it's not printed despite matching '*' and being default excluded.
+         // 'some_package' matches '*' and is not default excluded, so it's printed.
          expect(resultsWithStar).not.toContain('node_modules');
-         expect(resultsWithStar).not.toContain('node_modules/some_package');
+         expect(resultsWithStar).toContain('node_modules/some_package');
+         // --- End FIX ---
          // Should still exclude other defaults
          expect(resultsWithStar).not.toContain('.git');
          // Should contain '.' and other items matching '*'

@@ -42,6 +42,7 @@ export class DirectoryTraverser {
      * Checks if an item matches any pattern in a list.
      * Tests against the item's name, its normalized absolute path, and
      * (if relativePaths option is true) its normalized relative path.
+     * --- MODIFIED TO HANDLE /** PATTERNS CORRECTLY FOR DIRECTORIES ---
      */
     private matchesAnyPattern(
         name: string,
@@ -54,18 +55,52 @@ export class DirectoryTraverser {
         }
         // Normalize paths for consistent matching, always using forward slashes
         const absPathNormalized = path.normalize(fullPath).replace(/\\/g, '/');
-        const relPathNormalized = relativePath === '.' ? '.' : path.normalize(relativePath).replace(/\\/g, '/');
+        // Ensure relative path is calculated correctly for the root case as well
+        const relPathNormalized = this.options.relativePaths
+            ? (path.normalize(fullPath) === path.normalize(this.basePath) ? '.' : path.normalize(relativePath).replace(/\\/g, '/'))
+            : ''; // Only calculate if needed
 
-        const pathsToTest: string[] = [
+        const basePathsToTest: string[] = [
             name, // Base name (e.g., 'file.txt', 'node_modules')
             absPathNormalized // Absolute path (e.g., '/User/project/src/file.txt')
         ];
-        if (this.options.relativePaths && relPathNormalized) {
-             if (!pathsToTest.includes(relPathNormalized)) {
-                 pathsToTest.push(relPathNormalized); // Relative path (e.g., '.', 'src/file.txt')
-             }
+        if (this.options.relativePaths && relPathNormalized && !basePathsToTest.includes(relPathNormalized)) {
+            basePathsToTest.push(relPathNormalized); // Relative path (e.g., '.', 'src/file.txt')
         }
-        return micromatch.some(pathsToTest, patterns, this.baseMicromatchOptions);
+
+        // --- FIX START: Check each pattern individually for /** ---
+        for (const pattern of patterns) {
+            let currentPathsToTest = [...basePathsToTest]; // Copy base paths for this pattern
+
+            // If pattern ends with /**, it should match contents, not the dir itself.
+            // Remove the path representation that *is* the directory base from the list
+            // of paths we test against *this specific pattern*.
+            if (pattern.endsWith('/**')) {
+                const patternBase = pattern.substring(0, pattern.length - 3); // e.g., 'dir1' or '/abs/path/dir1'
+
+                // Filter out paths that are exactly the base of the globstar pattern
+                currentPathsToTest = currentPathsToTest.filter(p => {
+                    // Normalize the path being tested FOR THIS COMPARISON ONLY
+                    const normalizedTestPath = path.normalize(p).replace(/\\/g, '/');
+                    // Normalize the pattern base FOR THIS COMPARISON ONLY
+                    const normalizedPatternBase = path.normalize(patternBase).replace(/\\/g, '/');
+                    return normalizedTestPath !== normalizedPatternBase;
+                });
+
+                // If filtering removed all paths, this pattern cannot match
+                 if (currentPathsToTest.length === 0) {
+                     continue; // Skip to the next pattern
+                 }
+            }
+
+            // Now check if *any* of the potentially filtered paths match the current pattern
+            if (micromatch.some(currentPathsToTest, [pattern], this.baseMicromatchOptions)) {
+                return true; // Found a match with this pattern
+            }
+        }
+        // --- FIX END ---
+
+        return false; // No pattern matched after applying the /** filter logic
     }
 
     /** Calculates the relative path string based on options. */
