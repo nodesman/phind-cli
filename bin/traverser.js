@@ -155,6 +155,8 @@ class DirectoryTraverser {
         // 2. Include Check: Item must match at least one include pattern.
         const isIncluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.includePatterns);
         if (!isIncluded) {
+            // If the item itself isn't included, don't print it, even if it's a parent of an included item.
+            // The pruning logic should have already prevented skipping this directory if a child was included.
             return false;
         }
         // 3. Exclude Check: Check against the combined exclude patterns.
@@ -170,22 +172,21 @@ class DirectoryTraverser {
         if (isExcludedByDefaultOnly) {
             // Get the specific (non-'*', non-'.*', non-'**') include patterns
             const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-            // *** MODIFIED OVERRIDE LOGIC START ***
+            // *** --- START MODIFIED OVERRIDE LOGIC --- ***
             // Override applies IF:
-            // 1. The item ITSELF matches a specific explicit include pattern.
-            // Note: 'isIncluded' check already happened and was true to reach this point.
+            // 1. There are explicit includes defined by the user (non-'*', non-'**').
+            // 2. The item being checked was only excluded because of a default pattern.
+            // This allows printing parent directories (like node_modules) that match '*'
+            // when a child item is explicitly included. The `isIncluded` check above already
+            // verified that this item (e.g., node_modules) matches an include pattern (e.g., '*').
             if (explicitIncludes.length > 0) {
-                const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-                // If the item itself is explicitly included
-                if (isExplicitlyIncluded) { // MODIFIED: Override only if the item ITSELF matches an explicit include
-                    // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies due to explicit includes)`);
-                    return true; // Override applies - PRINT
-                }
+                // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies because explicit includes exist: ${explicitIncludes.join(', ')})`);
+                return true; // Override applies - PRINT
             }
-            // *** MODIFIED OVERRIDE LOGIC END ***
+            // *** --- END MODIFIED OVERRIDE LOGIC --- ***
         }
         // --- If we reach here: Item is excluded, and override conditions were not met.
-        // console.log(`DEBUG: Not printing "${name}" (excluded, override check failed)`);
+        // console.log(`DEBUG: Not printing "${name}" (excluded: ${isExcluded}, byDefaultOnly: ${isExcludedByDefaultOnly}, override check failed)`);
         return false; // Excluded - DO NOT PRINT
     }
     traverse(startPath_1) {

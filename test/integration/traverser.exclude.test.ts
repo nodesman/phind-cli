@@ -67,7 +67,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
     it('should exclude items matching a pattern with case sensitivity by default (absolute)', async () => {
          // Helper now applies default excludes
         const results = await runTraverse(testDir, spies.consoleLogSpy, { excludePatterns: ['*.JPG'] });
-        expect(results).not.toContain(path.join(testDir, 'dir2', 'image.JPG'));
+        expect(results).not.toContain(path.join(testDir, 'dir2', 'image_upper.JPG')); // Use unique name
         // expect(results).toContain(path.join(testDir, 'dir2', 'image.jpg')); // lowercase should still be included - Removed: Unreliable assumption about readdir/filesystem
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
     });
@@ -75,7 +75,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
     it('should exclude items matching a pattern with case sensitivity by default (relative)', async () => {
          // Helper now applies default excludes
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['*.JPG'] });
-        expect(results).not.toContain('dir2/image.JPG');
+        expect(results).not.toContain('dir2/image_upper.JPG'); // Use unique name
         // expect(results).toContain('dir2/image.jpg'); // lowercase should still be included - Removed: Unreliable assumption about readdir/filesystem
         expect(results).not.toContain('.git'); // Default exclude check
     });
@@ -183,6 +183,8 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         // Explicitly include node_modules and its contents
         const results = await runTraverse(testDir, spies.consoleLogSpy, {
              includePatterns: [nodeModulesPath, path.join(nodeModulesPath, '**')]
+             // Note: runTraverse helper applies default excludes to the `defaultExcludes` option,
+             // but the includePatterns here should override the exclusion for node_modules
         });
 
         // Should find node_modules and its contents despite being a default exclude
@@ -207,14 +209,19 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
 
          // Should still exclude other defaults like .git
          expect(results).not.toContain('.git');
+
          // The starting directory '.' should also be present if '*' isn't overridden completely
          // If includePatterns totally overrides '*', '.' might not be listed unless explicitly added
          // Let's add '*' back to includes to ensure '.' is considered along with the specific ones
          const resultsWithStar = await runTraverseRelative(testDir, spies.consoleLogSpy, {
-            includePatterns: ['*', 'node_modules', 'node_modules/**']
+            includePatterns: ['*', 'node_modules', 'node_modules/**'] // Add '*'
         });
-         expect(resultsWithStar).toContain('.');
-
+         expect(resultsWithStar).toContain('.'); // Check '.' is present
+         // Re-check the node_modules paths are still included with '*' present
+         expect(resultsWithStar).toContain('node_modules');
+         expect(resultsWithStar).toContain('node_modules/some_package');
+         expect(resultsWithStar).toContain('node_modules/some_package/index.js');
+         expect(resultsWithStar).not.toContain('.git'); // Still exclude .git
 
      });
 
@@ -231,17 +238,18 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
 
         // Should find the specific file.
         expect(results).toEqual([indexPath]);
-        // Crucially, node_modules itself or the intermediate package dir might not be printed
-        // because they don't match the specific include pattern 'indexPath'.
-        // The important part is that the traversal *entered* node_modules.
-        // If we included node_modules/** as well, they would be printed.
+        // Intermediate directories are NOT printed because they don't match the specific include pattern.
 
+        // Now, run with '*' included as well.
+        // With the fixed override logic in `shouldPrintItem`, node_modules should be printed
+        // because it matches '*' and the override prevents the default exclusion.
         const resultsWithStar = await runTraverse(testDir, spies.consoleLogSpy, {
             includePatterns: ['*', indexPath] // Add '*' back
         });
-         expect(resultsWithStar).toContain(nodeModulesPath);
-         expect(resultsWithStar).toContain(packagePath);
-         expect(resultsWithStar).toContain(indexPath);
+         // *** FIX: Update expectations ***
+         expect(resultsWithStar).toContain(nodeModulesPath); // <-- Should now be included
+         expect(resultsWithStar).toContain(packagePath);     // <-- Should now be included
+         expect(resultsWithStar).toContain(indexPath);       // Still included
          expect(resultsWithStar).not.toContain(path.join(testDir, '.git')); // Check other default still excluded
      });
 
@@ -255,15 +263,16 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          expect(results).toEqual([includePath]); // Only the explicitly included item matches
 
          // Add '*' back to includePatterns to see parent dirs
+         // With the fix, node_modules should be included because it matches '*' and the override applies.
           const resultsWithStar = await runTraverseRelative(testDir, spies.consoleLogSpy, {
              includePatterns: ['*', includePath]
          });
-         expect(resultsWithStar).toContain('node_modules');
-         expect(resultsWithStar).toContain('node_modules/some_package');
-         expect(resultsWithStar).toContain(includePath);
-         expect(resultsWithStar).toContain('.');
-         expect(resultsWithStar).not.toContain('.git'); // Check other default still excluded
+         // *** FIX: Update expectations ***
+         expect(resultsWithStar).toContain('node_modules');             // <-- Should now be included
+         expect(resultsWithStar).toContain('node_modules/some_package'); // <-- Should now be included
+         expect(resultsWithStar).toContain(includePath);                 // Still included
+         expect(resultsWithStar).toContain('.');                         // Still included
+         expect(resultsWithStar).not.toContain('.git');                  // Check other default still excluded
      });
-
 
 });
