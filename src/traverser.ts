@@ -131,6 +131,9 @@ export class DirectoryTraverser {
     /**
      * Checks if a directory should be pruned (i.e., not traversed into).
      * Prune if it matches an exclude pattern UNLESS an explicit include overrides it.
+     * Override occurs if:
+     * 1. The directory itself matches an explicit include pattern.
+     * 2. A non-wildcard include pattern targets a potential descendant.
      */
     private shouldPrune(
         name: string,
@@ -143,18 +146,50 @@ export class DirectoryTraverser {
             return false; // Not excluded, definitely don't prune
         }
 
-        // --- Item IS excluded. Check if an explicit include pattern overrides this exclusion. ---
-        const explicitIncludes = this.getExplicitIncludePatternsForOverride();
-        if (explicitIncludes.length > 0) {
-            const isExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-            if (isExplicitlyIncluded) {
-                // console.log(`DEBUG: Not pruning "${name}" because it is explicitly included (overriding exclusion).`);
-                return false; // Explicitly included, DO NOT prune
+        // --- Item IS excluded. Check for overrides ---
+
+        // Check 1: Does the directory ITSELF match an explicit pattern derived for directory matching?
+        const explicitDirIncludes = this.getExplicitIncludePatternsForOverride();
+        if (explicitDirIncludes.length > 0) {
+            if (this.matchesAnyPattern(name, fullPath, relativePath, explicitDirIncludes)) {
+                // console.log(`DEBUG: Not pruning "${name}" because it (directory) is explicitly included.`);
+                return false; // Directory itself is explicitly included, DO NOT prune
             }
         }
 
-        // --- If we reach here, it's excluded and NOT explicitly included. PRUNE. ---
-        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly included.`);
+        // Check 2: Does any NON-WILDCARD include pattern potentially target a descendant?
+        // Avoid pruning if a specific file/path inside this directory is explicitly included.
+        // Use the original nonDefaultIncludePatterns as they contain the specific targets.
+        // Normalize the directory path ONCE for comparison. Ensure it ends with a slash.
+        const normalizedDirPath = path.normalize(fullPath).replace(/\\/g, '/') + '/';
+
+        const hasPotentialDescendantInclude = this.nonDefaultIncludePatterns.some(includePattern => {
+            // Heuristic: Skip simple globs ('*.js') or base names ('file.txt') as they
+            // don't reliably indicate a path prefix relationship for descendant checking.
+            // We are interested in patterns that look like relative/absolute paths.
+            // This check might need refinement based on supported include pattern styles.
+            if (includePattern.includes('*') || !includePattern.includes(path.sep) && !includePattern.includes('/')) {
+                 return false;
+            }
+
+            // Resolve the include pattern relative to the basePath to get its absolute path
+            // for a consistent comparison.
+            let absoluteIncludePattern = path.normalize(path.resolve(this.basePath, includePattern)).replace(/\\/g, '/');
+
+            // Check if the resolved absolute include pattern starts with the directory's absolute path.
+            // It must be strictly *longer* than the directory path to be a descendant.
+            return absoluteIncludePattern.startsWith(normalizedDirPath) && absoluteIncludePattern.length > normalizedDirPath.length;
+        });
+
+
+        if (hasPotentialDescendantInclude) {
+           // console.log(`DEBUG: Not pruning "${name}" because an explicit include pattern targets a descendant.`);
+           return false; // Potential descendant included, DO NOT prune
+        }
+
+
+        // --- If we reach here, it's excluded and not explicitly included (itself or potentially descendants). PRUNE. ---
+         // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly included.`);
         return true;
     }
 
