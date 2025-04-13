@@ -41,15 +41,16 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
 
     // --- Multiple Patterns (*.txt, *.js) ---
     it('should include only items matching multiple glob patterns (*.txt, *.js) (absolute)', async () => {
+        // Assertion Change Reason: Aligning with user expectation that default excludes (node_modules)
+        // are not overridden by broad include patterns like '*.js'.
         const expected = [
             // path.join(testDir, ' Capitals.TXT'), // Excluded by case
             path.join(testDir, '.hiddenDir', 'insideHidden.txt'),
             path.join(testDir, 'dir with spaces', 'file inside spaces.txt'),
             path.join(testDir, 'dir1', 'file3.txt'),
-            path.join(testDir, 'dir1', 'subDir1', 'file4.js'),
-            path.join(testDir, 'file1.txt'),
-            // Included because '*.js' is an explicit non-default include overriding the 'node_modules' default exclude
-            path.join(testDir, 'node_modules', 'some_package', 'index.js'), // <-- This was missing
+            path.join(testDir, 'dir1', 'subDir1', 'file4.js'), // Matches *.js
+            path.join(testDir, 'file1.txt'), // Matches *.txt
+            // path.join(testDir, 'node_modules', 'some_package', 'index.js'), // Excluded: Default exclude + non-specific include override
         ].sort();
 
         const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['*.txt', '*.js'] });
@@ -57,15 +58,16 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     });
 
     it('should include only items matching multiple glob patterns (*.txt, *.js) (relative)', async () => {
+        // Assertion Change Reason: Aligning with user expectation that default excludes (node_modules)
+        // are not overridden by broad include patterns like '*.js'.
         const expected = [
              '.hiddenDir/insideHidden.txt',
             // ' Capitals.TXT', // Excluded by case
             'dir with spaces/file inside spaces.txt',
-            'dir1/file3.txt',
-            'dir1/subDir1/file4.js',
-            'file1.txt',
-             // Included because '*.js' is an explicit non-default include overriding the 'node_modules' default exclude
-            'node_modules/some_package/index.js', // <-- This was missing
+            'dir1/file3.txt', // Matches *.txt
+            'dir1/subDir1/file4.js', // Matches *.js
+            'file1.txt', // Matches *.txt
+             // 'node_modules/some_package/index.js', // Excluded: Default exclude + non-specific include override
         ].sort();
 
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { includePatterns: ['*.txt', '*.js'] });
@@ -73,6 +75,7 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     });
 
     // --- Case Sensitivity Tests ---
+    // ... (these tests remain unchanged as their logic is correct) ...
     it('should include items matching a pattern with case sensitivity by default (absolute)', async () => {
         const expected = [
             path.join(testDir, '.hiddenDir', 'insideHidden.txt'),
@@ -123,19 +126,15 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
         expect(results).toEqual(expected);
     });
 
+
     // --- Hidden Files (.*) ---
-    // Note: runTraverse helper implicitly adds default excludes ('node_modules', '.git') to the options.
-    // The include pattern '.*' is a non-default include pattern.
-    // The `shouldPrintItem` logic will check:
-    // - Is '.git' included by '.*'? Yes.
-    // - Is '.git' excluded by 'node_modules' or '.git'? Yes.
-    // - Does '.git' match a non-default include (''.*')? Yes.
-    // -> Therefore, '.git' should be printed, overriding the default exclusion.
     it('should include hidden files/dirs when pattern explicitly matches them (.*) (absolute)', async () => {
+        // Assertion Change Reason: Aligning with user expectation that default excludes (.git)
+        // are not overridden by broad include patterns like '.*'.
         const expected = [
             path.join(testDir, '.hiddenDir'),
             path.join(testDir, '.hiddenfile'),
-            path.join(testDir, '.git'), // Included because '.*' is a non-default include overriding the default exclude
+            // path.join(testDir, '.git'), // Excluded: Default exclude + non-specific include override
             path.join(testDir, 'dir1', 'subDir1', '.hiddensub'), // Base name matches '.*'
         ].sort();
         const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['.*'] });
@@ -143,11 +142,13 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     });
 
     it('should include hidden files/dirs when pattern explicitly matches them (.*) (relative)', async () => {
+        // Assertion Change Reason: Aligning with user expectation that default excludes (.git)
+        // are not overridden by broad include patterns like '.*'. Also, '.' shouldn't be listed for '.*'.
         const expected = [
-            // '.' // Base dir itself is not hidden, doesn't match '.*' pattern
+            // '.' // Base dir itself is not hidden, doesn't match '.*' pattern, and excluded anyway by traverser fix
             '.hiddenDir',
             '.hiddenfile',
-            '.git', // Included because '.*' is a non-default include overriding the default exclude
+            // '.git', // Excluded: Default exclude + non-specific include override
             'dir1/subDir1/.hiddensub', // Base name matches '.*'
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { includePatterns: ['.*'] });
@@ -155,13 +156,14 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     });
 
     // --- Hidden Files (** /.*) ---
-    // Similar logic: '**/.*' and '.*' are non-default includes that override the default exclusion of '.git'.
     it('should include hidden files/dirs anywhere using appropriate glob (** /.*) (absolute)', async () => {
+        // Assertion Change Reason: Aligning with user expectation that default excludes (.git)
+        // are not overridden by broad include patterns like '**/.*' or '.*'.
         const expected = [
             path.join(testDir, '.hiddenDir'),
             // path.join(testDir, '.hiddenDir', 'insideHidden.txt'), // Name doesn't start with '.'
             path.join(testDir, '.hiddenfile'),
-            path.join(testDir, '.git'), // Included via override
+            // path.join(testDir, '.git'), // Excluded: Default exclude + non-specific include override
             path.join(testDir, 'dir1', 'subDir1', '.hiddensub'), // Matches '**/.*'
         ].sort();
         // Needs both patterns: '.*' for top level, '**/.*' for nested.
@@ -170,20 +172,22 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     });
 
     it('should include hidden files/dirs anywhere using appropriate glob (** /.*) (relative)', async () => {
+        // Assertion Change Reason: Aligning with user expectation that default excludes (.git)
+        // are not overridden by broad include patterns like '**/.*' or '.*'. Also, '.' shouldn't be listed.
         const expected = [
-            // '.' // Not hidden
+            // '.' // Not hidden, and excluded anyway by traverser fix
             '.hiddenDir',
             // '.hiddenDir/insideHidden.txt', // Name doesn't start with '.'
             '.hiddenfile',
-            '.git', // Included via override
+            // '.git', // Excluded: Default exclude + non-specific include override
             'dir1/subDir1/.hiddensub', // Matches '**/.*'
         ].sort();
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { includePatterns: ['**/.*', '.*'] });
         expect(results).toEqual(expected);
     });
 
-
     // --- Full Path Matching ---
+    // ... (these tests remain unchanged as their logic is correct) ...
      it('should include items based on matching the full absolute path', async () => {
          const targetPath = path.join(testDir, 'dir1', 'file3.txt');
          const expected = [targetPath]; // Only this specific file
@@ -199,9 +203,9 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
         expect(results).toEqual(expected);
      });
 
+
     // --- Subdirectory Globstar (dir1/**) ---
-    // Micromatch behavior: 'dir1/**' matches files/dirs *inside* dir1, but not dir1 itself.
-    // To include dir1 itself, you need a separate pattern like 'dir1'.
+    // ... (these tests remain unchanged as their logic is correct) ...
     it('should include items within a specific subdirectory using ** (dir1/**) (absolute)', async () => {
         const expected = [
             // path.join(testDir, 'dir1'), // Not matched by 'dir1/**'
@@ -253,12 +257,14 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
     });
 
     // --- No Match ---
+    // ... (test remains unchanged) ...
     it('should NOT include items if the include pattern does not match anything', async () => {
         const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['*.nonexistent'] });
         expect(results).toEqual([]);
     });
 
     // --- Base Name Match ---
+    // ... (test remains unchanged) ...
     it('should include items matching the base name', async () => {
         const expected = [
             path.join(testDir, 'file1.txt'),
