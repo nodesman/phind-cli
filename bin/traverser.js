@@ -120,7 +120,7 @@ class DirectoryTraverser {
         return [...new Set([...specificNonDefaultIncludes, ...derivedPatterns])];
     }
     // ========================================================================
-    // ==                            START CHANGES                           ==
+    // ==                     START shouldPrune CHANGES                      ==
     // ========================================================================
     /** Checks if a directory should be pruned. */
     shouldPrune(name, fullPath, relativePath) {
@@ -131,7 +131,6 @@ class DirectoryTraverser {
         }
         // --- Item IS excluded. Check for explicit include override ---
         // Override Check 1: Does the directory ITSELF match an explicit non-default include pattern?
-        // (Handles cases like include: ['node_modules'] when node_modules is excluded by default)
         const explicitDirIncludes = this.getExplicitIncludePatternsForDirectoryOverride();
         if (explicitDirIncludes.length > 0) {
             if (this.matchesAnyPattern(name, fullPath, relativePath, explicitDirIncludes)) {
@@ -139,13 +138,24 @@ class DirectoryTraverser {
                 return false; // Directory itself is explicitly included, DO NOT prune
             }
         }
-        // --- REMOVED Override Check 2 ---
-        // We no longer prevent pruning of default excludes just because other non-default includes exist.
-        // If a directory is excluded (e.g., node_modules by default) and NOT explicitly included by name/path
-        // (Override Check 1), it SHOULD be pruned.
-        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly overridden by name/path.`);
-        return true; // Excluded and not overridden by explicit name/path include. PRUNE.
+        // --- ADD BACK Override Check 2 (modified): ---
+        // If the directory is excluded ONLY by a DEFAULT pattern, AND the user provided
+        // ANY non-default include patterns, DO NOT prune. This allows traversal to potentially
+        // find explicitly included items inside default-excluded dirs.
+        const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, this.options.defaultExcludes);
+        const cliAndGlobalExcludes = this.options.excludePatterns.filter(p => !this.options.defaultExcludes.includes(p));
+        const isExcludedByCliOrGlobal = this.matchesAnyPattern(name, fullPath, relativePath, cliAndGlobalExcludes);
+        if (isExcludedByDefault && !isExcludedByCliOrGlobal && this.nonDefaultIncludePatterns.length > 0) {
+            // console.log(`DEBUG: [Prune Override 2] Not pruning "${name}" because it's excluded only by default AND non-default includes exist.`);
+            return false; // Don't prune, allow descent
+        }
+        // --- END ADD BACK ---
+        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not overridden.`);
+        return true; // Excluded and not overridden. PRUNE.
     }
+    // ========================================================================
+    // ==                      END shouldPrune CHANGES                       ==
+    // ========================================================================
     /** Checks if an item (file or directory) should be printed based on all filters. */
     shouldPrintItem(name, fullPath, relativePath, isDirectory, isFile) {
         // --- ADDED: Prevent printing '.' when relativePaths is true ---
@@ -233,9 +243,6 @@ class DirectoryTraverser {
             return true;
         }
     } // End shouldPrintItem
-    // ========================================================================
-    // ==                              END CHANGES                           ==
-    // ========================================================================
     /** Main traversal method */
     traverse(startPath_1) {
         return __awaiter(this, arguments, void 0, function* (startPath, currentDepth = 0) {
