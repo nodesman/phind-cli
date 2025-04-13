@@ -236,8 +236,8 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         const resultsOnlySpecific = await runTraverse(testDir, spies.consoleLogSpy, {
             includePatterns: [indexPath]
         });
-        // Expect ONLY the specific file to be printed. Pruning is prevented by the non-default include,
-        // but the parent dirs ('node_modules', 'node_modules/some_package') don't match the include pattern 'indexPath'.
+        // Expect ONLY the specific file to be printed. Pruning is prevented by the refined non-default include check,
+        // and the item itself matches the specific include.
         expect(resultsOnlySpecific).toEqual([indexPath]);
         spies.consoleLogSpy.mockClear(); // Clear spy for next run
 
@@ -247,14 +247,12 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         });
          // Should contain the explicitly included file (override worked)
          expect(resultsWithStar).toContain(indexPath);
-         // --- FIX: Change expectation ---
-         // Should also contain the parent directories because they match '*' and pruning was prevented.
-         // The default exclusion of 'node_modules' is overridden for printing 'node_modules' itself only if 'node_modules'
-         // matches a *non-default* include (which it doesn't here).
-         // However, 'some_package' is not excluded by default and matches '*', so it IS printed.
-         expect(resultsWithStar).not.toContain(nodeModulesPath); // Doesn't match non-default include 'indexPath'
-         expect(resultsWithStar).toContain(packagePath);         // Matches '*', not excluded by default, pruning prevented
-         // --- End FIX ---
+         // Check parent dirs:
+         // Pruning of node_modules was prevented by include 'indexPath' targeting content inside.
+         // 'node_modules' is default excluded, and '*' is not specific enough to override the exclusion for printing.
+         // 'some_package' is not default excluded and matches '*', so it should be printed.
+         expect(resultsWithStar).not.toContain(nodeModulesPath);
+         expect(resultsWithStar).toContain(packagePath);
          // Should still exclude other defaults
          expect(resultsWithStar).not.toContain(path.join(testDir, '.git'));
          // Should contain other items matched by '*'
@@ -270,7 +268,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          const resultsOnlySpecific = await runTraverseRelative(testDir, spies.consoleLogSpy, {
              includePatterns: [includePath]
          });
-         // Expect ONLY the specific file to be printed. Pruning is prevented, but parents don't match 'includePath'.
+         // Expect ONLY the specific file to be printed. Pruning is prevented, item matches specific include.
          expect(resultsOnlySpecific).toEqual([includePath]);
          spies.consoleLogSpy.mockClear(); // Clear spy
 
@@ -280,13 +278,11 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          });
          // Should contain the explicitly included file (override worked)
          expect(resultsWithStar).toContain(includePath);
-         // --- FIX: Change expectation ---
-         // Should also contain the parent directories because they match '*' and pruning was prevented.
-         // 'node_modules' itself doesn't match the non-default include 'includePath', so it's not printed despite matching '*' and being default excluded.
+         // Check parent dirs: Pruning prevented.
+         // 'node_modules' is default excluded, '*' doesn't override print exclusion.
          // 'some_package' matches '*' and is not default excluded, so it's printed.
          expect(resultsWithStar).not.toContain('node_modules');
          expect(resultsWithStar).toContain('node_modules/some_package');
-         // --- End FIX ---
          // Should still exclude other defaults
          expect(resultsWithStar).not.toContain('.git');
          // Should contain '.' and other items matching '*'
@@ -306,16 +302,13 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         const results = await runTraverse(testDir, spies.consoleLogSpy, {
              includePatterns: ['*.js']
         });
-        // --- FIX ASSERTIONS START ---
-        // Expect ONLY the .js files OUTSIDE default excludes.
-        // Pruning of node_modules is prevented by the non-default include, BUT
-        // the broad '*.js' pattern does NOT override the default exclusion in shouldPrintItem.
+        // Pruning of node_modules should NOT be prevented because '*.js' does not target content inside specifically.
+        // Therefore, node_modules is pruned, and indexPath is never found.
         expect(results).not.toContain(indexPath); // Should NOT be included
         expect(results).toContain(otherJsPath);
         expect(results.length).toBe(1); // Only the JS file outside node_modules
         expect(results).not.toContain(nodeModulesPath);
         expect(results).not.toContain(packagePath);
-        // --- FIX ASSERTIONS END ---
     });
 
      // Test case 6: Include a glob pattern ('*.js') that matches a file inside a default-excluded directory (relative)
@@ -327,14 +320,13 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
             includePatterns: ['*.js']
         });
-        // --- FIX ASSERTIONS START ---
-        // Expect ONLY the .js files OUTSIDE default excludes.
+        // Pruning of node_modules should NOT be prevented because '*.js' does not target content inside specifically.
+        // Therefore, node_modules is pruned, and includePath is never found.
         expect(results).not.toContain(includePath); // Should NOT be included
         expect(results).toContain(otherJsPath);
         expect(results.length).toBe(1); // Only the JS file outside node_modules
         expect(results).not.toContain('node_modules');
         expect(results).not.toContain('node_modules/some_package');
-        // --- FIX ASSERTIONS END ---
    });
 
 }); // End describe block
