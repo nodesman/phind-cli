@@ -157,7 +157,7 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
             'doc.txt',
             'empty',
             // 'image.JPG', // <-- KEEP COMMENTED OR REMOVE
-            'image_upper.JPG', // <-- USE THIS UNIQUE NAME
+            'image_upper.JPG', // <<< USE THIS UNIQUE NAME
             'image.jpg',
             'script.js',
             'src',
