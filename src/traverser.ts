@@ -171,19 +171,35 @@ export class DirectoryTraverser {
             }
         }
 
-        // --- ADD BACK Override Check 2 (modified): ---
-        // If the directory is excluded ONLY by a DEFAULT pattern, AND the user provided
-        // ANY non-default include patterns, DO NOT prune. This allows traversal to potentially
-        // find explicitly included items inside default-excluded dirs.
+        // --- REFINED Override Check 2: ---
+        // If the directory is excluded ONLY by a DEFAULT pattern, AND there exists a non-default
+        // include pattern that appears to target something *inside* this directory, DO NOT prune.
         const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, this.options.defaultExcludes);
         const cliAndGlobalExcludes = this.options.excludePatterns.filter(p => !this.options.defaultExcludes.includes(p));
         const isExcludedByCliOrGlobal = this.matchesAnyPattern(name, fullPath, relativePath, cliAndGlobalExcludes);
 
         if (isExcludedByDefault && !isExcludedByCliOrGlobal && this.nonDefaultIncludePatterns.length > 0) {
-             // console.log(`DEBUG: [Prune Override 2] Not pruning "${name}" because it's excluded only by default AND non-default includes exist.`);
-             return false; // Don't prune, allow descent
+            const normFullPathPrefix = path.normalize(fullPath).replace(/\\/g, '/') + '/'; // Normalize and add trailing slash
+            const normRelativePathPrefix = this.options.relativePaths ? path.normalize(relativePath).replace(/\\/g, '/') + '/' : '';
+
+            // Check if any non-default include pattern starts with the path of the directory being considered
+            const targetsContentInside = this.nonDefaultIncludePatterns.some(p => {
+                const normPattern = path.normalize(p).replace(/\\/g, '/');
+                // Check absolute path prefix, OR relative path prefix if applicable
+                // Ensure pattern isn't just the directory path itself (already handled by Override 1)
+                // Check if pattern length is greater than prefix length to ensure it's targeting *inside*
+                return (normPattern.startsWith(normFullPathPrefix) && normPattern.length > normFullPathPrefix.length) ||
+                       (this.options.relativePaths && normRelativePathPrefix && normPattern.startsWith(normRelativePathPrefix) && normPattern.length > normRelativePathPrefix.length);
+            });
+
+
+            if (targetsContentInside) {
+                // console.log(`DEBUG: [Prune Override 2 - Refined] Not pruning "${name}" because a non-default include targets content inside.`);
+                return false; // Found an include targeting content inside, DO NOT prune
+            }
         }
-        // --- END ADD BACK ---
+        // --- END REFINED Override Check 2 ---
+
 
         // console.log(`DEBUG: Pruning "${name}" as it's excluded and not overridden.`);
         return true; // Excluded and not overridden. PRUNE.
