@@ -30,9 +30,7 @@ class DirectoryTraverser {
     }
     /**
      * Checks if an item matches any pattern in a list.
-     * Tests against the item's name, its normalized absolute path, and
-     * (if relativePaths option is true) its normalized relative path.
-     * --- MODIFIED TO HANDLE /** PATTERNS CORRECTLY FOR DIRECTORIES ---
+     * [ ... matchesAnyPattern implementation remains unchanged ... ]
      */
     matchesAnyPattern(name, fullPath, relativePath, patterns) {
         if (!patterns || patterns.length === 0) {
@@ -121,6 +119,9 @@ class DirectoryTraverser {
         // Combine specific original non-default patterns with derived patterns for directory name matching
         return [...new Set([...specificNonDefaultIncludes, ...derivedPatterns])];
     }
+    // ========================================================================
+    // ==                            START CHANGES                           ==
+    // ========================================================================
     /** Checks if a directory should be pruned. */
     shouldPrune(name, fullPath, relativePath) {
         // 1. Check if excluded by any pattern in the *effective* exclude list
@@ -128,7 +129,7 @@ class DirectoryTraverser {
         if (!isExcluded) {
             return false; // Not excluded, definitely don't prune
         }
-        // --- Item IS excluded. Check for overrides ---
+        // --- Item IS excluded. Check for explicit include override ---
         // Override Check 1: Does the directory ITSELF match an explicit non-default include pattern?
         // (Handles cases like include: ['node_modules'] when node_modules is excluded by default)
         const explicitDirIncludes = this.getExplicitIncludePatternsForDirectoryOverride();
@@ -138,26 +139,23 @@ class DirectoryTraverser {
                 return false; // Directory itself is explicitly included, DO NOT prune
             }
         }
-        // Override Check 2: Is this directory excluded *only* by a default pattern, AND
-        // did the user provide *any* non-default include patterns?
-        // If yes, we don't prune, allowing traversal to potentially find explicitly included descendants.
-        const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, this.options.defaultExcludes);
-        if (isExcludedByDefault) {
-            // Also check if it's *also* excluded by a CLI/global pattern. If so, don't override pruning.
-            const cliAndGlobalExcludes = this.options.excludePatterns.filter(p => !this.options.defaultExcludes.includes(p));
-            const isExcludedByCliOrGlobal = this.matchesAnyPattern(name, fullPath, relativePath, cliAndGlobalExcludes);
-            if (!isExcludedByCliOrGlobal && this.nonDefaultIncludePatterns.length > 0) {
-                // console.log(`DEBUG: [Prune Override 2] Not pruning "${name}" because it matches a default exclude but non-default includes exist (and no CLI/global exclude matches).`);
-                return false; // Matches default exclude, but user specified includes, so DO NOT prune.
-            }
-        }
-        // --- If we reach here, it's excluded and not overridden by the above checks. PRUNE. ---
-        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not overridden.`);
-        return true;
+        // --- REMOVED Override Check 2 ---
+        // We no longer prevent pruning of default excludes just because other non-default includes exist.
+        // If a directory is excluded (e.g., node_modules by default) and NOT explicitly included by name/path
+        // (Override Check 1), it SHOULD be pruned.
+        // console.log(`DEBUG: Pruning "${name}" as it's excluded and not explicitly overridden by name/path.`);
+        return true; // Excluded and not overridden by explicit name/path include. PRUNE.
     }
     /** Checks if an item (file or directory) should be printed based on all filters. */
     shouldPrintItem(name, fullPath, relativePath, isDirectory, isFile) {
-        // 1. Type Check
+        // --- ADDED: Prevent printing '.' when relativePaths is true ---
+        // The '.' represents the base for relative paths, not an item to list itself.
+        if (name === '.' && this.options.relativePaths && path_1.default.normalize(fullPath) === path_1.default.normalize(this.basePath)) {
+            // console.log(`DEBUG: Not printing "." for the starting directory in relative mode.`);
+            return false;
+        }
+        // --- END ADD ---
+        // 1. Type Check (remains the same)
         const { matchType } = this.options;
         if (matchType) {
             if (matchType === 'f' && !isFile)
@@ -175,18 +173,59 @@ class DirectoryTraverser {
         const isExcluded = this.matchesAnyPattern(name, fullPath, relativePath, this.options.excludePatterns);
         // --- Decision Logic ---
         if (isExcluded) {
-            // Item is excluded. Override if it matches ANY non-default include pattern.
-            // This allows includes like '*.js' or 'node_modules/pkg/index.js' to override
-            // the exclusion of 'node_modules'.
-            if (this.nonDefaultIncludePatterns.length > 0) {
-                const matchesNonDefaultInclude = this.matchesAnyPattern(name, fullPath, relativePath, this.nonDefaultIncludePatterns);
-                if (matchesNonDefaultInclude) {
-                    // console.log(`DEBUG: Printing "${name}" because it matches a non-default include (overriding exclusion).`);
-                    return true; // Explicitly included via non-default pattern, override the exclusion - PRINT
+            // Item is excluded. Override ONLY IF it matches a *specific* non-default include
+            // pattern that effectively targets this item, particularly for overriding default excludes.
+            // Broad patterns like '*' or '.*' should NOT override specific default excludes like '.git'.
+            // Check if it's excluded *specifically* by a default exclude pattern.
+            const isExcludedByDefault = this.matchesAnyPattern(name, fullPath, relativePath, this.options.defaultExcludes);
+            if (isExcludedByDefault && this.nonDefaultIncludePatterns.length > 0) {
+                // Check if any non-default include *specifically* targets this item.
+                // This requires a more refined check. We look for patterns that essentially
+                // match the item's name or a path segment identical to a default exclude.
+                // This prevents broad patterns like '*.js' or '.*' from overriding '.git'.
+                const specificTargetingIncludes = this.nonDefaultIncludePatterns.filter(p => {
+                    const normPattern = path_1.default.normalize(p).replace(/\\/g, '/');
+                    // Does the pattern exactly match the name? (e.g., pattern '.git' matches name '.git')
+                    if (normPattern === name)
+                        return true;
+                    // Does the pattern exactly match the relative path? (e.g., pattern 'node_modules' matches relative path 'node_modules')
+                    if (this.options.relativePaths && normPattern === relativePath)
+                        return true;
+                    // Does the pattern exactly match the absolute path?
+                    const normFullPath = path_1.default.normalize(fullPath).replace(/\\/g, '/');
+                    if (normPattern === normFullPath)
+                        return true;
+                    // Allow 'node_modules/**' or '.git/**' to override the default exclude FOR CONTENTS
+                    if (p.endsWith('/**')) {
+                        const patternBase = p.substring(0, p.length - 3);
+                        const normPatternBase = path_1.default.normalize(patternBase).replace(/\\/g, '/');
+                        // Check if the item's path *starts with* the base of the /** pattern
+                        // And ensure the item is *not* the base directory itself
+                        if ((relativePath.startsWith(normPatternBase + '/') || normFullPath.startsWith(normPatternBase + '/')) &&
+                            (relativePath !== normPatternBase && normFullPath !== normPatternBase)) {
+                            return true;
+                        }
+                    }
+                    // Add more sophisticated logic here if needed, e.g., pattern 'dist' overriding default exclude 'dist'
+                    return false;
+                });
+                if (specificTargetingIncludes.length > 0) {
+                    // Check if it's ALSO excluded by a CLI/Global pattern. If so, the CLI/Global exclude should still win.
+                    const cliAndGlobalExcludes = this.options.excludePatterns.filter(p => !this.options.defaultExcludes.includes(p));
+                    const isExcludedByCliOrGlobal = this.matchesAnyPattern(name, fullPath, relativePath, cliAndGlobalExcludes);
+                    if (!isExcludedByCliOrGlobal) {
+                        // console.log(`DEBUG: Printing "${name}" because it matches a SPECIFIC non-default include [${specificTargetingIncludes.join(', ')}] and is NOT excluded by CLI/Global (overriding default exclusion).`);
+                        return true; // Explicitly targeted by specific non-default include, override default exclusion - PRINT
+                    }
+                    else {
+                        // console.log(`DEBUG: Not printing "${name}" despite specific include, because it IS excluded by CLI/Global pattern.`);
+                    }
                 }
             }
-            // console.log(`DEBUG: Not printing "${name}" (included, but excluded, and not explicitly included to override).`);
-            return false; // Excluded and not overridden by a non-default include - DO NOT PRINT
+            // If not excluded by default (meaning excluded by CLI/Global) OR
+            // if excluded by default but not specifically overridden above, then DO NOT PRINT.
+            // console.log(`DEBUG: Not printing "${name}" (excluded, and not specifically included to override).`);
+            return false;
         }
         else {
             // Item is included and not excluded - PRINT
@@ -194,6 +233,9 @@ class DirectoryTraverser {
             return true;
         }
     } // End shouldPrintItem
+    // ========================================================================
+    // ==                              END CHANGES                           ==
+    // ========================================================================
     /** Main traversal method */
     traverse(startPath_1) {
         return __awaiter(this, arguments, void 0, function* (startPath, currentDepth = 0) {
@@ -201,14 +243,17 @@ class DirectoryTraverser {
             let canReadEntries = false;
             let isStartDir = false;
             if (currentDepth === 0) {
+                // Handle the starting path itself
                 try {
                     const stats = yield promises_1.default.stat(resolvedStartPath);
                     const isDirectory = stats.isDirectory();
                     const isFile = stats.isFile();
-                    isStartDir = isDirectory; // Track if the starting point itself is a directory
+                    isStartDir = isDirectory;
                     const dirName = path_1.default.basename(resolvedStartPath);
                     const relativePathForStart = this.calculateRelativePath(resolvedStartPath);
+                    // Use resolvedStartPath for absolute, relativePathForStart for relative display
                     const displayPath = this.options.relativePaths ? relativePathForStart : resolvedStartPath;
+                    // --- Rely on shouldPrintItem to handle the '.' case ---
                     if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
                         console.log(displayPath);
                     }
@@ -229,7 +274,7 @@ class DirectoryTraverser {
             if (currentDepth >= this.options.maxDepth) {
                 return;
             }
-            if (!canReadEntries) { // Also handles case where start path was a file
+            if (!canReadEntries) {
                 return;
             }
             // Read Directory Entries
@@ -238,7 +283,7 @@ class DirectoryTraverser {
                 entries = yield promises_1.default.readdir(resolvedStartPath, { withFileTypes: true });
             }
             catch (err) {
-                // Only log error if it wasn't the starting directory itself that failed (already logged above)
+                // Log errors appropriately (avoid duplicate logging for start path)
                 if (currentDepth > 0 || !isStartDir) {
                     if (err.code === 'EACCES' || err.code === 'EPERM') {
                         console.error(`Permission error reading directory ${resolvedStartPath.replace(/\\/g, '/')}: ${err.message}`);
@@ -263,6 +308,7 @@ class DirectoryTraverser {
                     continue;
                 }
                 // --- Print Check ---
+                // Rely on shouldPrintItem to handle the '.' case correctly now
                 if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
                     console.log(displayPath);
                 }
