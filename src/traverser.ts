@@ -124,7 +124,6 @@ export class DirectoryTraverser {
         return [...new Set([...specificNonDefaultIncludes, ...derivedPatterns])];
     }
 
-
     /**
      * Checks if a directory should be pruned (i.e., not traversed into).
      * Prune if it matches an exclude pattern UNLESS it specifically matches
@@ -177,7 +176,6 @@ export class DirectoryTraverser {
         return true;
     }
 
-
     /**
      * Checks if an item (file or directory) should be printed based on all filters.
      */
@@ -220,30 +218,26 @@ export class DirectoryTraverser {
             // Get the specific (non-'*', non-'.*', non-'**') include patterns
             const explicitIncludes = this.getExplicitIncludePatternsForOverride();
 
-            // *** --- START CORRECTED OVERRIDE LOGIC --- ***
-            // Override only applies IF the item being checked *itself* matches an explicit include pattern.
-            // We no longer rely solely on the existence of *any* explicit include.
+            // *** --- START REVISED OVERRIDE LOGIC --- ***
+            // If the exclusion was *only* due to a default pattern,
+            // and there are *any* explicit includes provided by the user
+            // (which might match this item or its descendants), then the
+            // default exclusion is overridden for *this specific item*.
+            // The `shouldPrune` logic already determined that traversal
+            // should continue based on potential descendant matches.
             if (explicitIncludes.length > 0) {
-                const isItemExplicitlyIncluded = this.matchesAnyPattern(name, fullPath, relativePath, explicitIncludes);
-                if (isItemExplicitlyIncluded) {
-                    // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies because it is explicitly included itself)`);
-                    return true; // Override applies - PRINT because item itself matches an explicit include
-                }
-                // If the item itself doesn't match an explicit include, the default exclusion stands,
-                // even if other explicit includes exist (e.g., for descendants). Descendants will be
-                // handled individually when the traversal reaches them.
+                 // console.log(`DEBUG: Printing "${name}" (excluded by default, but override applies because explicit includes exist)`);
+                 return true; // Override the default exclusion for printing this item.
             }
-            // *** --- END CORRECTED OVERRIDE LOGIC --- ***
+            // *** --- END REVISED OVERRIDE LOGIC --- ***
 
-            // If no explicit includes were provided OR the item itself didn't match an explicit include,
-            // the default exclusion remains in effect for this item.
+            // If no explicit includes were provided, the default exclusion remains in effect for this item.
         }
 
         // --- If we reach here: Item is excluded, and override conditions were not met.
         // console.log(`DEBUG: Not printing "${name}" (excluded: ${isExcluded}, byDefaultOnly: ${isExcludedByDefaultOnly}, override check failed)`);
         return false; // Excluded - DO NOT PRINT
     }
-
 
     public async traverse(startPath: string, currentDepth: number = 0): Promise<void> {
         const resolvedStartPath = path.resolve(startPath); // Ensure start path is absolute
@@ -283,7 +277,6 @@ export class DirectoryTraverser {
              // If not depth 0, we assume we are already inside a valid directory
              canReadEntries = true;
         }
-
 
         // --- 2. Depth Check for Recursion ---
         if (currentDepth >= this.options.maxDepth) {
