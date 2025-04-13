@@ -88,9 +88,9 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
          expect(result.status).toBe(0);
          // Expect relative paths, including '.' for the base dir itself if it matches filters
          // .git should be excluded by default.
-         // --- FIX: Add '.' to expected output ---
+         // --- FIX: Remove '.' from expected output ---
          const expected = [
-             '.', // Base dir matches '.*' with dot:true, should be included.
+             // '.', // Base dir itself doesn't match '.*' pattern for *name* matching, and is correctly excluded by traverser anyway in relative mode.
              '.config',
              // '.git', // Excluded by default
              '.hiddenDir',

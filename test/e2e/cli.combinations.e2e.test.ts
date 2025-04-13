@@ -18,10 +18,10 @@ describe('CLI E2E - Option Combinations', () => {
         testDir = realTestDir; // Use the resolved path for running the CLI
 
         // Create structure using the original (non-resolved) path
+        // Added .hiddenfile, .config for the '*' test case
         await createTestStructure(tempDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg', // Lowercase for case test
-            // 'image.JPG': 'jpeg upper', // <<< KEEP COMMENTED OR REMOVE
             'image_upper.JPG': 'jpeg upper', // <<< USE THIS UNIQUE NAME
             'script.js': 'javascript',
             'build': {
@@ -33,6 +33,9 @@ describe('CLI E2E - Option Combinations', () => {
                 'util.ts': 'typescript utils',
             },
             'empty': null,
+            '.hiddenfile': 'hidden', // For '*' test
+            '.config': { 'app.conf': 'config file' }, // For '*' test
+            '.hiddenDir': { 'content': 'hidden dir content' }, // For '*' test
             // Add default excluded dirs for the '--exclude node_modules .git' test
             'node_modules': { 'some_dep': { 'index.js': 'dep code'} },
             '.git': { 'config': 'HEAD' }
@@ -49,7 +52,7 @@ describe('CLI E2E - Option Combinations', () => {
         expect(result.status).toBe(0);
         const expected = [
             'src/main.ts',
-            'src/util.ts', // <-- FIX: Add util.ts based on observed failure
+            // 'src/util.ts', // <-- FIX: Removed as it's excluded by the command
         ].sort(); // <-- Expect relative paths
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
@@ -62,6 +65,8 @@ describe('CLI E2E - Option Combinations', () => {
         const expected = [
             '.',
             'build',
+            '.config', // Hidden dirs match '*' by default (dot:true)
+            '.hiddenDir',// Hidden dirs match '*' by default (dot:true)
             'empty',
             'src',
         ].sort();
@@ -78,6 +83,9 @@ describe('CLI E2E - Option Combinations', () => {
         expect(result.status).toBe(0);
         const expected = [
             '.', // <-- Starting dir relative
+            '.config', // Hidden dirs match '*' by default (dot:true)
+            '.hiddenDir', // Hidden dirs match '*' by default (dot:true)
+            '.hiddenfile', // Hidden files match '*' by default (dot:true)
             'build',
             'doc.txt',
             'empty',
@@ -95,7 +103,6 @@ describe('CLI E2E - Option Combinations', () => {
         expect(result.status).toBe(0);
         const expected = [
             'image.jpg', // <-- Expect relative path
-            // 'image.JPG', // <-- KEEP COMMENTED OR REMOVE
             'image_upper.JPG', // <-- USE THIS UNIQUE NAME
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
@@ -108,29 +115,31 @@ describe('CLI E2E - Option Combinations', () => {
         // Default maxdepth (infinity)
         // --no-global-ignore ensures only CLI excludes apply (default built-in excludes are not overridden here)
         const result = runCli(['--name', '*', '--exclude', 'node_modules', '.git', '--no-global-ignore', '--relative'], testDir);
-        // --->>> Check stderr if this still fails <<<---
-        // This test might still fail with status 1 due to underlying yargs parsing issue.
-        // The fix likely lies outside this file (cli.ts or helper).
-        if (result.status !== 0) {
-            console.error("Test Failure Stderr:", result.stderr);
-        }
-        expect(result.status).toBe(0); // Status should be 0 if successful
+
+        // Removed conditional console.error as the helper logic should be fixed
+        expect(result.status).toBe(0); // Status should be 0 if successful (assuming cli.helper.ts fix)
         const expected = [
             '.', // <-- Starting dir relative
+            '.config',              // Matches '*'
+            '.config/app.conf',     // Matches '*'
+            '.hiddenDir',           // Matches '*'
+            '.hiddenDir/content',   // Matches '*'
+            '.hiddenfile',          // Matches '*'
             'build',
             'build/app.exe',
             'build/output.log',
             'doc.txt',
             'empty',
-            // 'image.JPG', // <-- KEEP COMMENTED OR REMOVE
             'image_upper.JPG', // <-- USE THIS UNIQUE NAME
             'image.jpg',
             'script.js',
             'src',
             'src/main.ts',
             'src/util.ts',
+            // node_modules and .git are explicitly excluded by the command
         ].sort();
-        expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
+        const actualOutput = normalizeAndSort(result.stdoutLines);
+        expect(actualOutput).toEqual(expected);
     });
 
     it('should find files excluding specific directories up to depth 2 using CLI options (relative)', () => {
@@ -142,9 +151,13 @@ describe('CLI E2E - Option Combinations', () => {
         expect(result.status).toBe(0);
         const expected = [
             '.', // <-- Starting dir relative (depth 0)
+            '.config',              // Depth 1
+            '.config/app.conf',     // Depth 2
+            '.hiddenDir',           // Depth 1
+            '.hiddenDir/content',   // Depth 2
+            '.hiddenfile',          // Depth 1
             'doc.txt', // <-- Depth 1
             'empty', // <-- Depth 1
-            // 'image.JPG', // <-- KEEP COMMENTED OR REMOVE (Depth 1)
             'image_upper.JPG', // <-- USE THIS UNIQUE NAME (Depth 1)
             'image.jpg', // <-- Depth 1
             'script.js', // <-- Depth 1

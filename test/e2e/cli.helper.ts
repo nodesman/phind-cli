@@ -34,35 +34,39 @@ export const runCli = (
     args: string[],
     cwd: string,
     env?: NodeJS.ProcessEnv,
-    globalIgnorePath?: string | null
+    globalIgnorePath?: string | null // Keep this signature
 ): CliResult => {
     const cliPath = path.resolve(__dirname, '../../bin/cli.js');
 
-    // --- FIX START: Explicitly type processEnv ---
     const processEnv: NodeJS.ProcessEnv = {
         ...process.env,
         ...env,
         LC_ALL: 'C' // Force POSIX/English locale
     };
-    // --- FIX END ---
 
+    // --- FIX START: Correct environment variable logic ---
     const noGlobalIgnoreFlag = args.includes('--no-global-ignore');
 
     if (noGlobalIgnoreFlag) {
-        // Explicitly set to undefined for robust unsetting
-        // Now TypeScript knows this property *can* exist on processEnv
-        processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
+        // If --no-global-ignore is passed, the env var MUST be unset,
+        // regardless of the globalIgnorePath argument to runCli.
+        // Using delete is more robust than setting to undefined here.
+        delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
     } else {
+        // Only set the env var if --no-global-ignore is NOT present
         if (globalIgnorePath === null) {
-             // Explicitly unset if null is passed
-             processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
+             // Explicitly unset if null is passed (and no flag)
+             delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
         } else if (globalIgnorePath) {
+             // Set the path if provided (and no flag)
              processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = path.resolve(cwd, globalIgnorePath);
         } else {
-             // Default: ensure it's not set if not provided or undefined
-             processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH = undefined;
+             // Default: ensure it's not set if not provided or undefined (and no flag)
+             delete processEnv.PHIND_TEST_GLOBAL_IGNORE_PATH;
         }
     }
+    // --- FIX END ---
+
 
     const result = spawn.sync(process.execPath, [cliPath, ...args], {
         cwd,
@@ -75,6 +79,14 @@ export const runCli = (
 
     const stdoutNormalized = normalizeOutput(result.stdout);
     const stderrNormalized = normalizeOutput(result.stderr);
+
+    // --- FIX: Don't log stderr here unconditionally ---
+    // The test itself can log if needed based on status code
+    // if (result.status !== 0) {
+    //     console.error("CLI Error Stderr:", stderrNormalized);
+    // }
+    // --- END FIX ---
+
 
     return {
         stdout: stdoutNormalized,
