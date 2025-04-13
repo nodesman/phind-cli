@@ -48,7 +48,8 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
             path.join(testDir, 'dir1', 'file3.txt'),
             path.join(testDir, 'dir1', 'subDir1', 'file4.js'),
             path.join(testDir, 'file1.txt'),
-            // path.join(testDir, 'node_modules', 'some_package', 'index.js'), // Excluded by default in helper
+            // Included because '*.js' is an explicit include overriding the 'node_modules' default exclude
+            path.join(testDir, 'node_modules', 'some_package', 'index.js'), // <-- FIX: Added this line
         ].sort();
 
         const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['*.txt', '*.js'] });
@@ -63,7 +64,8 @@ describe('DirectoryTraverser - Include Patterns (--name)', () => {
             'dir1/file3.txt',
             'dir1/subDir1/file4.js',
             'file1.txt',
-            // 'node_modules/some_package/index.js', // Excluded by default in helper
+             // Included because '*.js' is an explicit include overriding the 'node_modules' default exclude
+            'node_modules/some_package/index.js', // <-- FIX: Added this line
         ].sort();
 
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { includePatterns: ['*.txt', '*.js'] });
