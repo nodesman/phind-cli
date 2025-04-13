@@ -1,8 +1,10 @@
 // test/integration/traverser.depth.test.ts
 import path from 'path';
 import fs from 'fs-extra'; // Import fs-extra for mocking readdir
-// --- FIX: Import promises API specifically for mocking ---
-import fsPromises, { Dirent, PathLike, ObjectEncodingOptions } from 'fs/promises'; // Added specific types
+// --- FIX 1: Import promises API specifically for mocking ---
+import fsPromises from 'fs/promises';
+// --- FIX 2: Import types from 'fs', not 'fs/promises' ---
+import type { Dirent, PathLike, ObjectEncodingOptions } from 'fs';
 import { setupTestEnvironment, cleanupTestEnvironment, runTraverse, runTraverseRelative, testStructure } from './traverser.helper';
 
 describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
@@ -85,7 +87,8 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             path.join(testDir, 'dir1'),
             path.join(testDir, 'dir2'),
             path.join(testDir, 'dir2', 'file5.log'),
-            path.join(testDir, 'dir2', 'image.JPG'),
+            // path.join(testDir, 'dir2', 'image.JPG'), // <-- Changed name in helper
+            path.join(testDir, 'dir2', 'image_upper.JPG'), // <-- Use unique name
             path.join(testDir, 'dir2', 'image.jpg'),
             path.join(testDir, 'emptyDir'),
             path.join(testDir, 'file1.txt'),
@@ -121,7 +124,8 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             'dir1',
             'dir2',
             'dir2/file5.log',
-            'dir2/image.JPG',
+            // 'dir2/image.JPG', // <-- Changed name in helper
+            'dir2/image_upper.JPG', // <-- Use unique name
             'dir2/image.jpg',
             'emptyDir',
             'file1.txt',
@@ -143,20 +147,23 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
         const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 100 });
         // Check a deep file exists, confirming recursion went deep
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
-        // Expect count to be greater than depth 2 count (adjust based on actual full structure count)
-        expect(results.length).toBeGreaterThan(20); // Adjust count based on final structure and excludes
+        // Adjust count based on final structure (testStructure) and default excludes
+        const totalExpectedCount = 25; // Manually count items in testStructure excluding node_modules/* and .git/* contents
+        expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should find all items if maxDepth is Infinity/MAX_SAFE_INTEGER (absolute)', async () => {
         const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER });
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
-         expect(results.length).toBeGreaterThan(20); // Adjust count
+        const totalExpectedCount = 25; // As above
+        expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should find all items if maxDepth is Infinity/MAX_SAFE_INTEGER (relative)', async () => {
         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER });
         expect(results).toContain('dir1/subDir1/file4.js');
-         expect(results.length).toBeGreaterThan(20); // Adjust count
+        const totalExpectedCount = 25; // As above
+        expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should not print items deeper than maxDepth', async () => {
@@ -166,17 +173,21 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
     });
 
     it('should stop recursing into directories when currentDepth equals maxDepth', async () => {
-        // This test tries to verify that readdir isn't called unnecessarily deep.
-        // --- FIX: Get the actual fs.promises.readdir function ---
+        // This test verifies that readdir isn't called unnecessarily deep.
         const originalReaddir = fsPromises.readdir;
 
-        // --- FIX: Spy on the promises version of readdir ---
-        // Explicitly type the spy to match the (path, { withFileTypes: true }) overload
-        const readdirMock = jest.spyOn(fsPromises, 'readdir') as jest.SpyInstance<Promise<Dirent[]>, [path: PathLike, options: ObjectEncodingOptions & { withFileTypes: true }]>;
+        // Spy on the promises version of readdir, targeting the overload used by the traverser
+        const readdirMock = jest.spyOn(fsPromises, 'readdir') as jest.SpyInstance<
+            Promise<Dirent[]>, // Return type of the overload
+            [path: PathLike, options: ObjectEncodingOptions & { withFileTypes: true }] // Arguments of the overload
+        >;
 
         // Mock implementation - Check path depth relative to testDir
-        // --- FIX: Update mock signature to match the specific overload being spied on ---
-        readdirMock.mockImplementation(async (dirPath: fs.PathLike, options?: BufferEncoding | { encoding?: BufferEncoding | null, withFileTypes?: boolean } | null): Promise<string[] | Buffer[] | fs.Dirent[]> => {
+        // --- FIX 3: Update mock signature to match the specific overload being spied on ---
+        readdirMock.mockImplementation(async (
+            dirPath: PathLike,
+            options: ObjectEncodingOptions & { withFileTypes: true } // Match the spy signature's options type
+        ): Promise<Dirent[]> => { // Match the spy signature's return type
             const currentPathStr = dirPath.toString(); // Ensure string for path operations
             const relativePath = path.relative(testDir, currentPathStr);
             const depth = relativePath === '' ? 0 : relativePath.split(path.sep).length;
@@ -188,10 +199,8 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             }
 
             // Allow calls for depth 0 and 1
-            // --- FIX: Call the original *promise* version and ensure options type matches.
-            // The spy setup ensures 'options' here should conform to the expected overload,
-            // but we cast defensively if needed, or rely on the spy setup's type hint.
-            return originalReaddir(dirPath, options);
+            // Call the original *promise* version, ensuring options type matches.
+            return originalReaddir(dirPath, options); // Options type now matches
         });
 
         // Run the traversal with maxDepth 1
@@ -201,14 +210,12 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
 
         // Verify readdir was called on the root and potentially depth 1 dirs
         const expectedOptions = expect.objectContaining({ withFileTypes: true });
-        // --- FIX: Use testDir directly, as it's resolved in setupTestEnvironment ---
         expect(readdirMock).toHaveBeenCalledWith(testDir, expectedOptions); // Called on root
         expect(readdirMock).toHaveBeenCalledWith(path.join(testDir, 'dir1'), expectedOptions); // May be called on depth 1 dirs like dir1
 
         // Check it wasn't called on a depth 2 directory
         expect(readdirMock).not.toHaveBeenCalledWith(path.join(testDir, 'dir1', 'subDir1'), expectedOptions);
 
-        // --- No need to call mockRestore here if using jest.restoreAllMocks() in afterEach ---
-        // readdirMock.mockRestore();
+        // No need to call mockRestore here if using jest.restoreAllMocks() in afterEach
     });
 });
