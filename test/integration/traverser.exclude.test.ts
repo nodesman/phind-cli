@@ -326,4 +326,3 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
    });
 
 });
-```

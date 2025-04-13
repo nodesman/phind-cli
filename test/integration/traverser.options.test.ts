@@ -48,7 +48,7 @@ describe('DirectoryTraverser - Other Options & Error Handling', () => {
        // Expect fewer results than baseline
        expect(results.length).toBeLessThan(baselineResults.length);
        // Expect *neither* case to be present due to case-insensitive exclude
-       expect(results).not.toContain(path.join(testDir, 'dir2', 'image.JPG'));
+       expect(results).not.toContain(path.join(testDir, 'dir2', 'image_upper.JPG')); // <<< USE UNIQUE NAME
        expect(results).not.toContain(path.join(testDir, 'dir2', 'image.jpg'));
     });
 
@@ -62,7 +62,7 @@ describe('DirectoryTraverser - Other Options & Error Handling', () => {
          // Expect fewer results than baseline
          expect(results.length).toBeLessThan(baselineResults.length);
          // Expect *neither* case to be present due to case-insensitive exclude
-         expect(results).not.toContain('dir2/image.JPG');
+         expect(results).not.toContain('dir2/image_upper.JPG'); // <<< USE UNIQUE NAME
          expect(results).not.toContain('dir2/image.jpg');
      });
 
@@ -127,7 +127,7 @@ describe('DirectoryTraverser - Other Options & Error Handling', () => {
         spies.consoleLogSpy.mockClear(); // Clear previous calls
         await traverser.traverse(testDir); // Start traversal from testDir
         const calls = spies.consoleLogSpy.mock.calls;
-        const relativeResults = normalizeAndSort(calls, true); // Use normalizeAndSort from helper
+        const relativeResults = normalizeAndSort(calls); // Use normalizeAndSort from helper
         // console.log("Relative results from custom base:", relativeResults); // Debug output
         expect(relativeResults).toContain('../file1.txt'); // Example assertion relative to dir1
         expect(relativeResults).toContain('.'); // dir1 relative to itself
