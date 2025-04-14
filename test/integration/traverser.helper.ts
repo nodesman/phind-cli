@@ -85,28 +85,20 @@ export async function cleanupTestEnvironment(testDir: string, spies: { consoleLo
     spies.consoleErrorSpy.mockRestore();
 }
 
-// Helper to normalize and sort output paths
+// Helper to normalize and sort output paths from spy calls
 export const normalizeAndSort = (calls: any[][]): string[] => {
-    // The `calls` array contains the arguments passed to console.log.
-    // We assume call[0] is the path string logged by the traverser.
-    // The traverser ALREADY produced the correct relative/absolute path based on options.
-    // We just need to normalize separators and sort here.
     return calls
         .map(call => {
             let p = call[0]; // The path string logged by the traverser
 
             // Check if p is a string before normalizing
             if (typeof p !== 'string') {
-                // Handle cases where console.log might have been called with non-strings
-                // (e.g., during debugging), although it shouldn't happen in normal operation.
-                // You might want to return a placeholder, filter it out, or throw an error.
                 console.warn(`normalizeAndSort encountered non-string log: ${p}`);
                 return ''; // Return empty string or handle as appropriate
             }
 
+            // --- REMOVED path.normalize(p) ---
 
-            // Normalize path separators etc.
-            p = path.normalize(p);
             // Ensure consistent forward slashes for comparison across platforms
             p = p.replace(/\\/g, '/');
 

@@ -102,6 +102,27 @@ export const runCli = (
 // Helper to normalize and sort output lines for comparison
 export const normalizeAndSort = (lines: string[]) => {
     return lines
-        .map(line => path.normalize(line).replace(/\\/g, '/')) // Normalize separators
+        .map(line => {
+            let p = line; // Input is already string[]
+
+            // Check if p is a string (redundant but safe)
+            if (typeof p !== 'string') {
+                console.warn(`normalizeAndSort encountered non-string: ${p}`);
+                return '';
+            }
+
+            // --- REMOVED path.normalize(p) ---
+
+            // Ensure consistent forward slashes for comparison across platforms
+            p = p.replace(/\\/g, '/');
+
+            // If the original path was empty string, represent as '.'
+            if (p === '') {
+                return '.';
+            }
+
+            return p;
+        })
+        .filter(p => p !== '') // Filter out any empty strings
         .sort();
 }
