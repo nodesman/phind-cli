@@ -5,7 +5,7 @@ import fs from 'fs-extra'; // Import fs-extra for mocking readdir
 import fsPromises from 'fs/promises';
 // --- FIX 2: Import types from 'fs', not 'fs/promises' ---
 import type { Dirent, PathLike, ObjectEncodingOptions } from 'fs';
-import { setupTestEnvironment, cleanupTestEnvironment, runTraverse, runTraverseRelative, testStructure } from './traverser.helper';
+import { setupTestEnvironment, cleanupTestEnvironment, runTraverse, runTraverseAbsolute, testStructure } from './traverser.helper'; // Updated helper names
 
 describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
     let testDir: string;
@@ -21,12 +21,12 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
     });
 
     it('should find only the starting item when maxDepth=0 (absolute)', async () => {
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 0 });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { maxDepth: 0 }); // Use absolute helper
         expect(results).toEqual([testDir]);
     });
 
     it('should find only the starting item "." when maxDepth=0 (relative)', async () => {
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: 0 });
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 0 }); // Use default relative helper
         expect(results).toEqual(['.']);
     });
 
@@ -47,28 +47,29 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             path.join(testDir, 'unreadable_dir'),
             testDir
         ].sort();
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 1 });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { maxDepth: 1 }); // Use absolute helper
         expect(results).toEqual(expected);
     });
 
     it('should find items only at depth 0 and 1 when maxDepth=1 (relative)', async () => {
          // Helper now correctly applies default excludes
+         // Updated expectations with './' prefix
         const expected = [
             '.',
-            // '.git', // Excluded by default
-            '.hiddenDir',
-            '.hiddenfile',
-            ' Capitals.TXT',
-            'dir with spaces',
-            'dir1',
-            'dir2',
-            'emptyDir',
-            'file1.txt',
-            'file2.log',
-            // 'node_modules', // Excluded by default
-            'unreadable_dir',
+            // './.git', // Excluded by default
+            './.hiddenDir',
+            './.hiddenfile',
+            './ Capitals.TXT',
+            './dir with spaces',
+            './dir1',
+            './dir2',
+            './emptyDir',
+            './file1.txt',
+            './file2.log',
+            // './node_modules', // Excluded by default
+            './unreadable_dir',
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: 1 });
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 1 }); // Use default relative helper
         expect(results).toEqual(expected);
     });
 
@@ -104,47 +105,48 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             testDir // Base dir itself
         ].sort();
 
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 2 });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { maxDepth: 2 }); // Use absolute helper
         expect(results).toEqual(expected);
     });
 
     it('should find items up to the specified maxDepth (e.g., 2) (relative)', async () => {
         // Helper now correctly applies default excludes
+        // Updated expectations with './' prefix
         const expected = [
             '.',
-            // '.git', // Excluded by default
-            // '.git/config', // Excluded by default
-            // '.git/HEAD', // Excluded by default
-            '.hiddenDir',
-            '.hiddenDir/insideHidden.txt',
-            '.hiddenfile',
-            ' Capitals.TXT',
-            'dir with spaces',
-            'dir with spaces/file inside spaces.txt',
-            'dir1',
-            'dir2',
-            'dir2/file5.log',
-            // 'dir2/image.JPG', // <-- Changed name in helper
-            'dir2/image_upper.JPG', // <-- Use unique name
-            'dir2/image.jpg',
-            'emptyDir',
-            'file1.txt',
-            'file2.log',
-            // 'node_modules', // Excluded by default
-            // 'node_modules/some_package', // Excluded by default
-            // 'node_modules/some_package/index.js', // Excluded by default
-            'unreadable_dir',
-            'dir1/exclude_me.tmp',
-            'dir1/file3.txt',
-            'dir1/file6.data',
-            'dir1/subDir1',
+            // './.git', // Excluded by default
+            // './.git/config', // Excluded by default
+            // './.git/HEAD', // Excluded by default
+            './.hiddenDir',
+            './.hiddenDir/insideHidden.txt',
+            './.hiddenfile',
+            './ Capitals.TXT',
+            './dir with spaces',
+            './dir with spaces/file inside spaces.txt',
+            './dir1',
+            './dir2',
+            './dir2/file5.log',
+            // './dir2/image.JPG', // <-- Changed name in helper
+            './dir2/image_upper.JPG', // <-- Use unique name
+            './dir2/image.jpg',
+            './emptyDir',
+            './file1.txt',
+            './file2.log',
+            // './node_modules', // Excluded by default
+            // './node_modules/some_package', // Excluded by default
+            // './node_modules/some_package/index.js', // Excluded by default
+            './unreadable_dir',
+            './dir1/exclude_me.tmp',
+            './dir1/file3.txt',
+            './dir1/file6.data',
+            './dir1/subDir1',
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: 2 });
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 2 }); // Use default relative helper
         expect(results).toEqual(expected);
     });
 
     it('should find all items if maxDepth is greater than actual depth (absolute)', async () => {
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 100 });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { maxDepth: 100 }); // Use absolute helper
         // Check a deep file exists, confirming recursion went deep
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
         // Adjust count based on final structure (testStructure) and default excludes
@@ -153,23 +155,23 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
     });
 
     it('should find all items if maxDepth is Infinity/MAX_SAFE_INTEGER (absolute)', async () => {
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER }); // Use absolute helper
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
         const totalExpectedCount = 23; // As above
         expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should find all items if maxDepth is Infinity/MAX_SAFE_INTEGER (relative)', async () => {
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER });
-        expect(results).toContain('dir1/subDir1/file4.js');
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: Number.MAX_SAFE_INTEGER }); // Use default relative helper
+        expect(results).toContain('./dir1/subDir1/file4.js'); // Updated expectation with ./
         const totalExpectedCount = 23; // As above
         expect(results.length).toBe(totalExpectedCount);
     });
 
     it('should not print items deeper than maxDepth', async () => {
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: 1 });
-        expect(results).not.toContain('dir1/subDir1/file4.js'); // Depth 3
-        expect(results).not.toContain('.hiddenDir/insideHidden.txt'); // Depth 2
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 1 }); // Use default relative helper
+        expect(results).not.toContain('./dir1/subDir1/file4.js'); // Depth 3 (updated expectation with ./)
+        expect(results).not.toContain('./.hiddenDir/insideHidden.txt'); // Depth 2 (updated expectation with ./)
     });
 
     it('should stop recursing into directories when currentDepth equals maxDepth', async () => {
@@ -204,7 +206,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
         });
 
         // Run the traversal with maxDepth 1
-        await expect(runTraverseRelative(testDir, spies.consoleLogSpy, { maxDepth: 1 }))
+        await expect(runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 1 })) // Use default relative helper
             .resolves // Expect it to complete without throwing the error from the mock
             .not.toThrow();
 

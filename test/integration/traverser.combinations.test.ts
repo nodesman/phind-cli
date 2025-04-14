@@ -1,6 +1,6 @@
 // test/integration/traverser.combinations.test.ts
 import path from 'path';
-import { setupTestEnvironment, cleanupTestEnvironment, runTraverse, runTraverseRelative } from './traverser.helper';
+import { setupTestEnvironment, cleanupTestEnvironment, runTraverse, runTraverseAbsolute } from './traverser.helper'; // Updated helper names
 
 describe('DirectoryTraverser - Option Combinations', () => {
     let testDir: string;
@@ -19,67 +19,68 @@ describe('DirectoryTraverser - Option Combinations', () => {
     it('should find specific file types within a certain depth (type=f, maxDepth=1) (relative)', async () => {
          const expected = [
             // '.' is not a file
-            '.hiddenfile',
-            ' Capitals.TXT',
-            'file1.txt',
-            'file2.log',
+            './.hiddenfile',
+            './ Capitals.TXT',
+            './file1.txt',
+            './file2.log',
         ].sort();
-        // Helper automatically applies default excludes now, which is fine for type=f
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { matchType: 'f', maxDepth: 1 });
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { matchType: 'f', maxDepth: 1 });
         expect(results).toEqual(expected);
     });
 
     it('should find specific directory types within a certain depth (type=d, maxDepth=1) (relative)', async () => {
         const expected = [
             '.',
-            // '.git', // Excluded by default via helper
-            '.hiddenDir',
-            'dir with spaces',
-            'dir1',
-            'dir2',
-            'emptyDir',
-            // 'node_modules', // Excluded by default via helper
-            'unreadable_dir',
+            // './.git', // Excluded by default via helper
+            './.hiddenDir',
+            './dir with spaces',
+            './dir1',
+            './dir2',
+            './emptyDir',
+            // './node_modules', // Excluded by default via helper
+            './unreadable_dir',
         ].sort();
-        // Helper automatically applies default excludes now, so no need to pass them in options here
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { matchType: 'd', maxDepth: 1 });
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { matchType: 'd', maxDepth: 1 });
         expect(results).toEqual(expected);
     });
 
     it('should exclude patterns only up to a certain depth (exclude *.log, maxDepth=1)', async () => {
        const expected = [
             '.', // Start dir
-            // '.git', // Excluded by default via helper
-            '.hiddenDir',
-            '.hiddenfile',
-            ' Capitals.TXT',
-            'dir with spaces',
-            'dir1',
-            'dir2',
-            'emptyDir',
-            'file1.txt',
-            // 'file2.log' Excluded by pattern at depth 1
-            // 'node_modules', // Excluded by default via helper
-            'unreadable_dir',
+            // './.git', // Excluded by default via helper
+            './.hiddenDir',
+            './.hiddenfile',
+            './ Capitals.TXT',
+            './dir with spaces',
+            './dir1',
+            './dir2',
+            './emptyDir',
+            './file1.txt',
+            // './file2.log' Excluded by pattern at depth 1
+            // './node_modules', // Excluded by default via helper
+            './unreadable_dir',
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['*.log'], maxDepth: 1 });
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { excludePatterns: ['*.log'], maxDepth: 1 });
         expect(results).toEqual(expected);
     });
 
     it('should include patterns only up to a certain depth (include *.txt, maxDepth=1)', async () => {
          // Only '.txt' files at depth 0 or 1. Case-insensitive due to ignoreCase: true
          // '.' is depth 0 but not a file and doesn't match '*.txt'
-         // '.hiddenDir/insideHidden.txt' is depth 2, excluded by maxDepth
-         // 'dir with spaces/file inside spaces.txt' is depth 2, excluded by maxDepth
-         // 'dir1/file3.txt' is depth 2, excluded by maxDepth
-         // ' Capitals.TXT' is depth 1 and matches '*.txt' case-insensitively
-         // 'file1.txt' is depth 1 and matches '*.txt'
+         // './.hiddenDir/insideHidden.txt' is depth 2, excluded by maxDepth
+         // './dir with spaces/file inside spaces.txt' is depth 2, excluded by maxDepth
+         // './dir1/file3.txt' is depth 2, excluded by maxDepth
+         // './ Capitals.TXT' is depth 1 and matches '*.txt' case-insensitively
+         // './file1.txt' is depth 1 and matches '*.txt'
         const expected = [
-            ' Capitals.TXT', // Included due to ignoreCase: true
-            'file1.txt',
+            './ Capitals.TXT', // Included due to ignoreCase: true
+            './file1.txt',
         ].sort();
-        // Add ignoreCase: true to match the likely intent of including ' Capitals.TXT'
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { includePatterns: ['*.txt'], maxDepth: 1, ignoreCase: true });
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { includePatterns: ['*.txt'], maxDepth: 1, ignoreCase: true });
         expect(results).toEqual(expected);
     });
 
@@ -93,7 +94,8 @@ describe('DirectoryTraverser - Option Combinations', () => {
             path.join(testDir, 'dir with spaces', 'file inside spaces.txt'), // Depth 2
             // path.join(testDir, 'dir1', 'file3.txt'), // Excluded by path pattern
         ].sort();
-        const results = await runTraverse(testDir, spies.consoleLogSpy, {
+        // Use new absolute helper runTraverseAbsolute
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, {
             includePatterns: ['**/*.txt'], // Match all txt files
             excludePatterns: [path.join(testDir, 'dir1')], // Exclude dir1 entirely
             matchType: 'f',
@@ -108,14 +110,15 @@ describe('DirectoryTraverser - Option Combinations', () => {
          // Default excludes applied by helper
         const expected = [
             // MaxDepth 1
-            ' Capitals.TXT',
-            'file1.txt',
+            './ Capitals.TXT',
+            './file1.txt',
             // MaxDepth 2
-            '.hiddenDir/insideHidden.txt',
-            'dir with spaces/file inside spaces.txt',
-            // 'dir1/file3.txt' is excluded by pattern 'dir1'
+            './.hiddenDir/insideHidden.txt',
+            './dir with spaces/file inside spaces.txt',
+            // './dir1/file3.txt' is excluded by pattern 'dir1'
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, {
             includePatterns: ['**/*.txt'], // Match all txt files
             excludePatterns: ['dir1'], // Exclude dir1 entirely
             matchType: 'f',
@@ -130,10 +133,11 @@ describe('DirectoryTraverser - Option Combinations', () => {
        // The helper structure now creates 'image.jpg' and 'image_upper.JPG'
        // Default excludes applied by helper
        const expected = [
-            'dir2/image.jpg',     // Lowercase match
-            'dir2/image_upper.JPG' // Uppercase match due to ignoreCase
+            './dir2/image.jpg',     // Lowercase match
+            './dir2/image_upper.JPG' // Uppercase match due to ignoreCase
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, {
             includePatterns: ['*.jpg'],
             matchType: 'f',
             ignoreCase: true
@@ -143,25 +147,25 @@ describe('DirectoryTraverser - Option Combinations', () => {
 
     it('should handle ignoreCase combined with exclude patterns and depth limit', async () => {
         // Expected files/dirs at depth 0 or 1, excluding default excludes and 'capitals.txt' (case-insensitive)
-        // ' Capitals.TXT' has a leading space, so it won't match 'capitals.txt' even case-insensitively.
+        // './ Capitals.TXT' has a leading space, so it won't match 'capitals.txt' even case-insensitively.
         const expected = [
             '.',
-            ' Capitals.TXT', // Not excluded
-            // '.git', // Excluded by default via helper
-            '.hiddenDir',
-            '.hiddenfile',
-            'dir with spaces',
-            'dir1',
-            'dir2',
-            'emptyDir',
-            'file1.txt', // Not excluded
-            'file2.log', // Not excluded
-            // 'node_modules', // Excluded by default via helper
-            'unreadable_dir',
+            './ Capitals.TXT', // Not excluded
+            // './.git', // Excluded by default via helper
+            './.hiddenDir',
+            './.hiddenfile',
+            './dir with spaces',
+            './dir1',
+            './dir2',
+            './emptyDir',
+            './file1.txt', // Not excluded
+            './file2.log', // Not excluded
+            // './node_modules', // Excluded by default via helper
+            './unreadable_dir',
         ].sort();
 
-        // Exclude 'capitals.txt' (lowercase), ignoreCase=true, maxDepth=1
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, {
             excludePatterns: ['capitals.txt'],
             maxDepth: 1,
             ignoreCase: true,
@@ -175,24 +179,25 @@ describe('DirectoryTraverser - Option Combinations', () => {
        // The helper structure now creates 'image.jpg' and 'image_upper.JPG'
        const expected = [
             '.', // Starting dir
-            // '.git', // Excluded by default via helper
-            '.hiddenDir',
-            '.hiddenDir/insideHidden.txt', // Content of non-pruned dir
-            '.hiddenfile',
-            ' Capitals.TXT', // Not excluded
-            'dir with spaces',
-            'dir with spaces/file inside spaces.txt', // Content of non-pruned dir
-            'dir2',
-            'dir2/file5.log', // Content of non-pruned dir
-            'dir2/image.jpg', // Content of non-pruned dir
-            'dir2/image_upper.JPG', // Content of non-pruned dir
-            'emptyDir',
-            'file1.txt',
-            'file2.log',
-            // 'node_modules', // Excluded by default via helper
-            'unreadable_dir',
+            // './.git', // Excluded by default via helper
+            './.hiddenDir',
+            './.hiddenDir/insideHidden.txt', // Content of non-pruned dir
+            './.hiddenfile',
+            './ Capitals.TXT', // Not excluded
+            './dir with spaces',
+            './dir with spaces/file inside spaces.txt', // Content of non-pruned dir
+            './dir2',
+            './dir2/file5.log', // Content of non-pruned dir
+            './dir2/image.jpg', // Content of non-pruned dir
+            './dir2/image_upper.JPG', // Content of non-pruned dir
+            './emptyDir',
+            './file1.txt',
+            './file2.log',
+            // './node_modules', // Excluded by default via helper
+            './unreadable_dir',
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['dir1'], ignoreCase: true });
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { excludePatterns: ['dir1'], ignoreCase: true });
         expect(results).toEqual(expected);
     });
 
@@ -202,24 +207,25 @@ describe('DirectoryTraverser - Option Combinations', () => {
         // The helper structure now creates 'image.jpg' and 'image_upper.JPG'
         const expected = [
            '.',
-           // '.git', // Excluded by default via helper
-           '.hiddenDir',
-           '.hiddenDir/insideHidden.txt', // Content of non-pruned dir
-           '.hiddenfile',
-           ' Capitals.TXT', // Not excluded
-           'dir with spaces',
-           'dir with spaces/file inside spaces.txt', // Content of non-pruned dir
-           'dir2',
-           'dir2/file5.log', // Content of non-pruned dir
-           'dir2/image.jpg', // Content of non-pruned dir
-           'dir2/image_upper.JPG', // Content of non-pruned dir
-           'emptyDir',
-           'file1.txt',
-           'file2.log',
-           // 'node_modules', // Excluded by default via helper
-           'unreadable_dir',
+           // './.git', // Excluded by default via helper
+           './.hiddenDir',
+           './.hiddenDir/insideHidden.txt', // Content of non-pruned dir
+           './.hiddenfile',
+           './ Capitals.TXT', // Not excluded
+           './dir with spaces',
+           './dir with spaces/file inside spaces.txt', // Content of non-pruned dir
+           './dir2',
+           './dir2/file5.log', // Content of non-pruned dir
+           './dir2/image.jpg', // Content of non-pruned dir
+           './dir2/image_upper.JPG', // Content of non-pruned dir
+           './emptyDir',
+           './file1.txt',
+           './file2.log',
+           // './node_modules', // Excluded by default via helper
+           './unreadable_dir',
         ].sort();
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, { excludePatterns: ['dIr1'], ignoreCase: true });
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { excludePatterns: ['dIr1'], ignoreCase: true });
         expect(results).toEqual(expected);
     });
 
@@ -230,22 +236,23 @@ describe('DirectoryTraverser - Option Combinations', () => {
          // Default excludes (.git, node_modules) applied by helper
          const expected = [
             // Depth 1 files:
-            '.hiddenfile',
-            ' Capitals.TXT',
-            'file1.txt',
-            'file2.log',
+            './.hiddenfile',
+            './ Capitals.TXT',
+            './file1.txt',
+            './file2.log',
 
             // Depth 2 files (excluding dir2 contents and default excluded dirs):
-            '.hiddenDir/insideHidden.txt',
-            'dir with spaces/file inside spaces.txt',
-            'dir1/exclude_me.tmp',
-            'dir1/file3.txt',
-            'dir1/file6.data',
-            // dir1/subDir1/file4.js is depth 3, excluded by maxDepth
-            // dir2/** is pruned by exclude 'dir2'
+            './.hiddenDir/insideHidden.txt',
+            './dir with spaces/file inside spaces.txt',
+            './dir1/exclude_me.tmp',
+            './dir1/file3.txt',
+            './dir1/file6.data',
+            // './dir1/subDir1/file4.js' is depth 3, excluded by maxDepth
+            // './dir2/**' is pruned by exclude 'dir2'
         ].sort();
 
-        const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
+        // Use new default relative helper runTraverse
+        const results = await runTraverse(testDir, spies.consoleLogSpy, {
             // No need for includePatterns: ['*'] as it's the default in the helper
             excludePatterns: ['dir2'], // Explicitly prune dir2
             matchType: 'f',
@@ -260,18 +267,19 @@ describe('DirectoryTraverser - Option Combinations', () => {
          // Default excludes (.git, node_modules) are applied by helper
          const expected = [
             '.',
-            // '.git', // Excluded by default helper
-            // '.hiddenDir', // Excluded by **/.*
-            'dir with spaces',
-            'dir1',
-            'dir1/subDir1', // Not hidden, does not start with 'file'
-            'dir2',
-            'emptyDir',
-            // 'node_modules', // Excluded by default helper
-            'unreadable_dir',
+            // './.git', // Excluded by default helper
+            // './.hiddenDir', // Excluded by **/.*
+            './dir with spaces',
+            './dir1',
+            './dir1/subDir1', // Not hidden, does not start with 'file'
+            './dir2',
+            './emptyDir',
+            // './node_modules', // Excluded by default helper
+            './unreadable_dir',
             // Files like file1.txt, file2.log are excluded by **/file* and type=d
          ].sort();
-         const results = await runTraverseRelative(testDir, spies.consoleLogSpy, {
+         // Use new default relative helper runTraverse
+         const results = await runTraverse(testDir, spies.consoleLogSpy, {
             // No includePatterns needed (default is '*')
             excludePatterns: ['**/.*', '**/file*'], // Exclude hidden and 'file*' items
             matchType: 'd' // Only directories

@@ -18,7 +18,6 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
         await createTestStructure(tempDir, {
             'doc.txt': 'text',
             'image.jpg': 'jpeg',
-            // 'image.JPG': 'jpeg upper', // <<< KEEP COMMENTED OR REMOVE
             'image_upper.JPG': 'jpeg upper', // <<< USE THIS UNIQUE NAME
             'script.js': 'javascript',
             '.config': { 'app.conf': 'config file' },
@@ -45,124 +44,112 @@ describe('CLI E2E - Include Patterns (--name, -n)', () => {
     });
 
     it('should include only files matching a single --name pattern (relative)', () => {
-        // Add --relative flag
-        const result = runCli(['--name', '*.txt', '--relative'], testDir);
+        // Relative is default
+        const result = runCli(['--name', '*.txt'], testDir);
         expect(result.status).toBe(0);
-        // Expect relative paths
-        const expected = ['doc.txt'].sort();
-        // --- FIX: Be stricter. '.' should NOT be included for this specific pattern ---
-        const actualFiltered = result.stdoutLines.filter(l => l !== '.');
+        // Expect relative paths with ./ prefix
+        const expected = ['./doc.txt'].sort();
+        const actualFiltered = result.stdoutLines.filter(l => l !== '.'); // Filter out the base dir listing '.'
         expect(normalizeAndSort(actualFiltered)).toEqual(expected);
     });
 
     it('should include only files matching multiple --name patterns (relative)', () => {
-         // Add --relative flag
-        const result = runCli(['--name', '*.txt', '--name', '*.js', '--relative'], testDir);
+        // Relative is default
+        const result = runCli(['--name', '*.txt', '--name', '*.js'], testDir);
         expect(result.status).toBe(0);
-        // Expect relative paths
-        const expected = ['doc.txt', 'script.js'].sort();
-        // --- FIX: Be stricter. '.' should NOT be included for these specific patterns ---
+        // Expect relative paths with ./ prefix
+        const expected = ['./doc.txt', './script.js'].sort();
         const actualFiltered = result.stdoutLines.filter(l => l !== '.');
         expect(normalizeAndSort(actualFiltered)).toEqual(expected);
     });
 
     it('should include files based on glob patterns (e.g., *.txt) (relative)', () => {
-         // Add --relative flag
-        const result = runCli(['--name', '*.txt', '--relative'], testDir);
+        // Relative is default
+        const result = runCli(['--name', '*.txt'], testDir);
         expect(result.status).toBe(0);
-        // Expect relative paths
-        const expected = ['doc.txt'].sort();
-         // --- FIX: Be stricter. '.' should NOT be included for this specific pattern ---
+        // Expect relative paths with ./ prefix
+        const expected = ['./doc.txt'].sort();
         const actualFiltered = result.stdoutLines.filter(l => l !== '.');
         expect(normalizeAndSort(actualFiltered)).toEqual(expected);
     });
 
     it('should include hidden files when pattern allows (e.g., .*) (relative)', () => {
-         // Add --relative flag
-         // NOTE: Default excludes are applied unless overridden. Here '*' includes are used,
-         // but the default PhindConfig excludes node_modules and .git.
-         // The --name '.*' pattern *will* match .git, but the traverser's exclude logic (including defaults)
-         // should prevent it unless it's explicitly included again.
-         // The test pattern '.*' should match .config, .hiddenFile, .hiddenDir
-         const result = runCli(['--name', '.*', '--relative'], testDir);
+         // Relative is default
+         // Default excludes (.git, node_modules) are applied.
+         // --name '.*' pattern matches .config, .hiddenFile, .hiddenDir.
+         // It also matches .git, but the default exclude prevents it from being listed.
+         const result = runCli(['--name', '.*'], testDir);
          expect(result.status).toBe(0);
-         // Expect relative paths, including '.' for the base dir itself if it matches filters
-         // .git should be excluded by default.
-         // --- FIX: Remove '.' from expected output ---
+         // Expect relative paths with ./ prefix for hidden items.
+         // The starting dir '.' is not matched by '.*'.
+         // .git is excluded by default.
          const expected = [
-             // '.', // Base dir itself doesn't match '.*' pattern for *name* matching, and is correctly excluded by traverser anyway in relative mode.
-             '.config',
-             // '.git', // Excluded by default
-             '.hiddenDir',
-             '.hiddenFile'
+             './.config',
+             './.hiddenDir',
+             './.hiddenFile'
          ].sort();
-         const actualFiltered = result.stdoutLines.filter(l => !l.startsWith('.git'));
+         // Filter out './.git*' just in case something unexpected leaks through
+         const actualFiltered = result.stdoutLines.filter(l => l !== '.' && !l.startsWith('./.git'));
          expect(normalizeAndSort(actualFiltered)).toEqual(expected);
-         // Check count is correct
          expect(actualFiltered.length).toBe(expected.length);
     });
 
     it('should include files in subdirectories matching a pattern (relative)', () => {
-        // Add --relative flag
+        // Relative is default
         // Pattern 'src/*' only matches immediate children of src
-         const result = runCli(['--name', 'src/*', '--relative'], testDir);
+         const result = runCli(['--name', 'src/*'], testDir);
          expect(result.status).toBe(0);
-         // Expect relative paths
-         const expected = ['src/main.ts', 'src/util.ts'].sort();
-         // --- FIX: Be stricter ---
+         // Expect relative paths with ./ prefix
+         const expected = ['./src/main.ts', './src/util.ts'].sort();
          const actualFiltered = result.stdoutLines.filter(l => l !== '.');
          expect(normalizeAndSort(actualFiltered)).toEqual(expected);
     });
 
      it('should include directories matching a specific pattern (relative)', () => {
+        // Relative is default
         // Test finding the '.hiddenDir' using a pattern like '.*Dir'
-        const result = runCli(['--name', '.*Dir', '--relative'], testDir);
+        const result = runCli(['--name', '.*Dir'], testDir);
         expect(result.status).toBe(0);
-        const expected = ['.hiddenDir'].sort();
-        // --- FIX: Be stricter ---
+        const expected = ['./.hiddenDir'].sort();
         const actualFiltered = result.stdoutLines.filter(l => l !== '.');
         expect(normalizeAndSort(actualFiltered)).toEqual(expected);
      });
 
 
     it('should handle --name patterns with case sensitivity by default (relative)', () => {
-        // Add --relative flag
-        // const result = runCli(['--name', 'image.JPG', '--relative'], testDir); // <<< KEEP COMMENTED OR REMOVE
-        const result = runCli(['--name', 'image_upper.JPG', '--relative'], testDir); // <<< TO THIS
+        // Relative is default
+        const result = runCli(['--name', 'image_upper.JPG'], testDir); // Use unique name
         expect(result.status).toBe(0);
-         // Expect relative paths
-        // const expected = ['image.JPG']; // <<< KEEP COMMENTED OR REMOVE
-        const expected = ['image_upper.JPG']; // <<< USE THIS UNIQUE NAME
-        // --- FIX: Be stricter ---
+         // Expect relative paths with ./ prefix
+        const expected = ['./image_upper.JPG']; // Use unique name
         const actualFiltered = result.stdoutLines.filter(l => l !== '.');
         expect(normalizeAndSort(actualFiltered)).toEqual(expected);
     });
 
     it('should default to including everything (*) if --name is not provided (relative)', () => {
-        // Add --relative flag
+        // Relative is default
         // Default excludes (node_modules, .git) should be applied by the application logic.
-        const result = runCli(['--relative'], testDir);
+        const result = runCli([], testDir);
         expect(result.status).toBe(0);
-        // Expect relative paths, excluding defaults
+        // Expect relative paths with ./ prefix, excluding defaults
         const expected = [
             '.', // Starting directory
-            '.config',
-            '.config/app.conf',
-            '.hiddenDir',
-            '.hiddenDir/content',
-            '.hiddenFile',
-            'build',
-            'build/app.exe',
-            'build/output.log',
-            'doc.txt',
-            'empty',
-            // 'image.JPG', // <-- KEEP COMMENTED OR REMOVE
-            'image_upper.JPG', // <<< USE THIS UNIQUE NAME
-            'image.jpg',
-            'script.js',
-            'src',
-            'src/main.ts',
-            'src/util.ts',
+            './.config',
+            './.config/app.conf',
+            './.hiddenDir',
+            './.hiddenDir/content',
+            './.hiddenFile',
+            './build',
+            './build/app.exe',
+            './build/output.log',
+            './doc.txt',
+            './empty',
+            './image_upper.JPG', // Use unique name
+            './image.jpg',
+            './script.js',
+            './src',
+            './src/main.ts',
+            './src/util.ts',
         ].sort();
          // The result should already have default excludes removed by the app
          const actual = result.stdoutLines;

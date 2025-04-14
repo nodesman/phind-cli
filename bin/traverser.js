@@ -82,10 +82,25 @@ class DirectoryTraverser {
             return '';
         }
         if (path_1.default.normalize(fullPath) === path_1.default.normalize(this.basePath)) {
-            return '.';
+            return '.'; // The starting directory itself is always '.'
         }
-        const relPath = path_1.default.relative(this.basePath, fullPath);
-        return (relPath || path_1.default.basename(fullPath)).replace(/\\/g, '/');
+        let relPath = path_1.default.relative(this.basePath, fullPath);
+        // Normalize separators FIRST for reliable startsWith check and consistent output
+        relPath = relPath.replace(/\\/g, '/');
+        // Prepend './' if it's not empty, not '.', and doesn't already start with '../'
+        if (relPath && relPath !== '.' && !relPath.startsWith('..')) {
+            relPath = './' + relPath;
+        }
+        else if (!relPath) {
+            // Fallback if path.relative somehow returns empty for non-base paths
+            // This case is less likely but provides a fallback.
+            relPath = path_1.default.basename(fullPath).replace(/\\/g, '/');
+            if (relPath && relPath !== '.' && !relPath.startsWith('..')) {
+                relPath = './' + relPath;
+            }
+        }
+        // Paths starting with '../' or just '.' are returned as is (after slash normalization)
+        return relPath;
     }
     /** Prepares a list of "explicit" include patterns used for overriding directory pruning. */
     getExplicitIncludePatternsForDirectoryOverride() {

@@ -87,6 +87,7 @@ describe('CLI E2E - Argument Validation and Error Handling', () => {
              }
         }
 
+        // Run CLI. Default is now relative paths.
         const result = runCli([testDir], testDir); // Run on the parent directory
 
         // Restore permissions immediately after run, before assertions
@@ -104,8 +105,8 @@ describe('CLI E2E - Argument Validation and Error Handling', () => {
         }
 
         // Check if the readable file was found (indicating continuation)
-        // Use realTestDir when checking absolute paths in output
-        expect(result.stdoutLines).toContain(path.join(testDir, 'readable', 'accessible.txt'));
+        // Default output is relative, prefixed with './'
+        expect(result.stdoutLines).toContain('./readable/accessible.txt');
 
         // If chmod succeeded, we expect the error message. Otherwise, this part of the test is unreliable.
         if (!chmodError) {

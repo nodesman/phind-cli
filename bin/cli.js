@@ -77,8 +77,12 @@ class PhindApp {
             .option('relative', {
             alias: 'r',
             type: 'boolean',
-            description: 'Print paths relative to the starting directory',
-            default: false,
+            // NEW DESCRIPTION: Explain the default and how to get absolute
+            description: 'Print paths relative to the starting directory (default). Use --relative=false for absolute paths.',
+            // NEW DEFAULT: Change from false to true
+            default: true,
+            // NEW DEFAULT DESCRIPTION
+            defaultDescription: "true (relative paths)",
         })
             .help()
             .alias('help', 'h')
@@ -137,7 +141,7 @@ class PhindApp {
                 matchType: argv.type ?? null,
                 maxDepth: maxDepth,
                 ignoreCase: argv.ignoreCase,
-                relativePaths: argv.relative,
+                relativePaths: argv.relative, // Will be true by default now
                 // Pass the consistently defined defaults for override logic
                 defaultExcludes: defaultExcludesForOverrideLogic,
             };

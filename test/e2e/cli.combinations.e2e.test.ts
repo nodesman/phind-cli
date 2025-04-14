@@ -47,98 +47,92 @@ describe('CLI E2E - Option Combinations', () => {
     });
 
     it('should correctly combine --name, --exclude, and --type (relative)', () => {
-        // Switched to relative path for easier assertion
-        const result = runCli(['--name', '*.ts', '--exclude', 'util.ts', '--type', 'f', '--relative'], testDir);
+        // Relative is default
+        const result = runCli(['--name', '*.ts', '--exclude', 'util.ts', '--type', 'f'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            'src/main.ts',
-            // 'src/util.ts', // <-- FIX: Removed as it's excluded by the command
-        ].sort(); // <-- Expect relative paths
+            './src/main.ts',
+            // './src/util.ts', // Excluded by command
+        ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
     it('should correctly combine --type, --maxdepth, and --relative', () => {
-        // This test already uses relative, should be fine
-        const result = runCli(['--type', 'd', '--maxdepth', '1', '--relative'], testDir);
+        // Relative is default
+        const result = runCli(['--type', 'd', '--maxdepth', '1'], testDir);
         expect(result.status).toBe(0);
         // Default excludes (.git, node_modules) ARE applied automatically by the app
         const expected = [
             '.',
-            'build',
-            '.config', // Hidden dirs match '*' by default (dot:true)
-            '.hiddenDir',// Hidden dirs match '*' by default (dot:true)
-            'empty',
-            'src',
+            './build',
+            './.config',
+            './.hiddenDir',
+            './empty',
+            './src',
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
     it('should correctly combine --exclude, --ignore-case, and --maxdepth 1 (relative)', () => {
-        // Switched to relative paths
+        // Relative is default
         // Excludes image_upper.JPG (and image.jpg because of --ignore-case and pattern *.jpg)
         // Maxdepth 1 includes start dir + immediate children
         // Default excludes (.git, node_modules) ARE applied automatically by the app
-        // Use a pattern that matches both to test exclude + ignore case
-        const result = runCli(['--exclude', '*.jpg', '--ignore-case', '--maxdepth', '1', '--relative'], testDir);
+        const result = runCli(['--exclude', '*.jpg', '--ignore-case', '--maxdepth', '1'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            '.', // <-- Starting dir relative
-            '.config', // Hidden dirs match '*' by default (dot:true)
-            '.hiddenDir', // Hidden dirs match '*' by default (dot:true)
-            '.hiddenfile', // Hidden files match '*' by default (dot:true)
-            'build',
-            'doc.txt',
-            'empty',
-            'script.js',
-            'src',
+            '.',
+            './.config',
+            './.hiddenDir',
+            './.hiddenfile',
+            './build',
+            './doc.txt',
+            './empty',
+            './script.js',
+            './src',
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
     it('should correctly combine --name and --ignore-case (relative)', () => {
-        // Switched to relative paths
-        // Should find both image.jpg and image_upper.JPG when matching IMAGE.JPG case-insensitively
-        // const result = runCli(['--name', 'IMAGE.JPG', '--ignore-case', '--relative'], testDir); // <<< ORIGINAL PATTERN
-        const result = runCli(['--name', '*.jpg', '--ignore-case', '--relative'], testDir); // <<< BETTER PATTERN TO TEST CASE INSENSITIVITY
+        // Relative is default
+        // Should find both image.jpg and image_upper.JPG when matching *.jpg case-insensitively
+        const result = runCli(['--name', '*.jpg', '--ignore-case'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            'image.jpg', // <-- Expect relative path
-            'image_upper.JPG', // <-- USE THIS UNIQUE NAME
+            './image.jpg',
+            './image_upper.JPG',
         ].sort();
         expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
     });
 
     it('should correctly combine --exclude, --skip-global-ignore, and --name * (relative)', () => {
-        // Switched to relative paths
+        // Relative is default
         // Explicitly exclude node_modules and .git via CLI exclude
         // Name * means find everything not explicitly excluded by CLI (global is ignored)
         // Default maxdepth (infinity)
         // --skip-global-ignore ensures only CLI excludes apply (default built-in excludes are not overridden here)
-        // Repeat --exclude for each value for correct yargs parsing
-        // --- UPDATE FLAG ---
-        const result = runCli(['--name', '*', '--exclude', 'node_modules', '--exclude', '.git', '--skip-global-ignore', '--relative'], testDir);
-        // --- END UPDATE ---
+        const result = runCli(['--name', '*', '--exclude', 'node_modules', '--exclude', '.git', '--skip-global-ignore'], testDir);
 
-        // Removed conditional console.error as the helper logic should be fixed
-        expect(result.status).toBe(0); // Status should be 0 if successful (assuming cli.helper.ts fix)
+        expect(result.status).toBe(0);
         const expected = [
-            '.', // <-- Starting dir relative
-            '.config',              // Matches '*'
-            '.config/app.conf',     // Matches '*'
-            '.hiddenDir',           // Matches '*'
-            '.hiddenDir/content',   // Matches '*'
-            '.hiddenfile',          // Matches '*'
-            'build',
-            'build/app.exe',
-            'build/output.log',
-            'doc.txt',
-            'empty',
-            'image_upper.JPG', // <-- USE THIS UNIQUE NAME
-            'image.jpg',
-            'script.js',
-            'src',
-            'src/main.ts',
-            'src/util.ts',
+            '.',
+            './.config',
+            './.config/app.conf',
+            './.hiddenDir',
+            './.hiddenDir/content',
+            './.hiddenfile',
+            './build',
+            './build/app.exe',
+            './build/output.log',
+            './doc.txt',
+            './empty',
+            './image_upper.JPG',
+            './image.jpg',
+            './script.js',
+            './src',
+            './src/main.ts',
+            './src/util.ts',
             // node_modules and .git are explicitly excluded by the command
         ].sort();
         const actualOutput = normalizeAndSort(result.stdoutLines);
@@ -146,27 +140,27 @@ describe('CLI E2E - Option Combinations', () => {
     });
 
     it('should find files excluding specific directories up to depth 2 using CLI options (relative)', () => {
-        // Switched to relative paths
+        // Relative is default
         // Maxdepth 2 means starting dir (depth 0), direct children (depth 1), grandchildren (depth 2)
         // Exclude 'build' directory (prunes it)
         // Default excludes (.git, node_modules) ARE applied automatically by the app
-        const result = runCli(['--maxdepth', '2', '--exclude', 'build', '--relative'], testDir);
+        const result = runCli(['--maxdepth', '2', '--exclude', 'build'], testDir);
         expect(result.status).toBe(0);
         const expected = [
-            '.', // <-- Starting dir relative (depth 0)
-            '.config',              // Depth 1
-            '.config/app.conf',     // Depth 2
-            '.hiddenDir',           // Depth 1
-            '.hiddenDir/content',   // Depth 2
-            '.hiddenfile',          // Depth 1
-            'doc.txt', // <-- Depth 1
-            'empty', // <-- Depth 1
-            'image_upper.JPG', // <-- USE THIS UNIQUE NAME (Depth 1)
-            'image.jpg', // <-- Depth 1
-            'script.js', // <-- Depth 1
-            'src', // <-- Depth 1
-            'src/main.ts', // <-- Depth 2
-            'src/util.ts', // <-- Depth 2
+            '.', // Depth 0
+            './.config',              // Depth 1
+            './.config/app.conf',     // Depth 2
+            './.hiddenDir',           // Depth 1
+            './.hiddenDir/content',   // Depth 2
+            './.hiddenfile',          // Depth 1
+            './doc.txt', // Depth 1
+            './empty', // Depth 1
+            './image_upper.JPG', // Depth 1
+            './image.jpg', // Depth 1
+            './script.js', // Depth 1
+            './src', // Depth 1
+            './src/main.ts', // Depth 2
+            './src/util.ts', // Depth 2
             // 'build' and its contents are excluded
             // '.git' and 'node_modules' are excluded by default
         ].sort();

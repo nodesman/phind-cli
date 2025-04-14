@@ -86,7 +86,6 @@ export async function cleanupTestEnvironment(testDir: string, spies: { consoleLo
 }
 
 // Helper to normalize and sort output paths
-// --- START FIX ---
 export const normalizeAndSort = (calls: any[][]): string[] => {
     // The `calls` array contains the arguments passed to console.log.
     // We assume call[0] is the path string logged by the traverser.
@@ -122,67 +121,64 @@ export const normalizeAndSort = (calls: any[][]): string[] => {
         .filter(p => p !== '') // Filter out any empty strings from non-string logs
         .sort();
 };
-// --- END FIX ---
 
 
-// Runner function
-export const runTraverse = async (
-    startPath: string, // Allow specifying a start path different from testDir base
+// --- START: Helper Refactoring ---
+
+// Base runner function - implements the core logic
+const runTraverseBase = async (
+    startPath: string,
     consoleLogSpy: jest.SpyInstance,
-    options: Partial<TraverseOptions> = {}
+    options: Partial<TraverseOptions> & { relativePathsOverride?: boolean } // Allow override for specific tests
 ): Promise<string[]> => {
-    // --- START FIX: Refactored options handling ---
     const hardcodedDefaults = ['node_modules', '.git'];
+
+    // Determine the final relativePaths setting
+    const relativePaths = options.relativePathsOverride ?? true; // Default to RELATIVE now
 
     // Combine hardcoded defaults with any excludes explicitly passed in test options
     const combinedExcludes = [
         ...hardcodedDefaults,
-        ...(options.excludePatterns || []) // Add excludes specifically from the test options
+        ...(options.excludePatterns || [])
     ];
     const uniqueCombinedExcludes = [...new Set(combinedExcludes)];
 
-    // Base options for the traverser, excluding the ones we'll specifically set/override
-    // Use defaults that mirror the CLI behavior if not provided in options
-    const baseOptions: Omit<TraverseOptions, 'excludePatterns' | 'defaultExcludes' | 'includePatterns' | 'relativePaths'> = {
-        matchType: options.matchType === undefined ? null : options.matchType, // Explicitly handle null
+    const finalOptions: TraverseOptions = {
+        includePatterns: options.includePatterns ?? ['*'],
+        excludePatterns: uniqueCombinedExcludes,
+        matchType: options.matchType === undefined ? null : options.matchType,
         maxDepth: options.maxDepth ?? Number.MAX_SAFE_INTEGER,
         ignoreCase: options.ignoreCase ?? false,
+        relativePaths: relativePaths, // Use the determined value
+        defaultExcludes: hardcodedDefaults,
     };
 
-     // Final options passed to the traverser constructor
-     const finalOptions: TraverseOptions = {
-         ...baseOptions, // Start with base non-conflicting options
-         // Apply test-specific options that should override baseOptions if present
-         includePatterns: options.includePatterns ?? ['*'], // Default to '*' if not specified
-         relativePaths: options.relativePaths ?? false, // Default to absolute paths
-         // --- Crucial part for exclude logic ---
-         excludePatterns: uniqueCombinedExcludes, // Use the combined list for actual exclusion filtering
-         defaultExcludes: hardcodedDefaults, // ALWAYS pass the hardcoded defaults for the override logic check
-         // Pass other options directly if they exist in the 'options' object
-         ...(options.matchType !== undefined && { matchType: options.matchType }),
-         ...(options.maxDepth !== undefined && { maxDepth: options.maxDepth }),
-         ...(options.ignoreCase !== undefined && { ignoreCase: options.ignoreCase }),
-     };
-    // --- END FIX ---
-
-    // Use the provided startPath to determine the basePath for the traverser instance.
     const absoluteBasePath = path.resolve(startPath);
-
     const traverser = new DirectoryTraverser(finalOptions, absoluteBasePath);
-    // Start the actual traversal from the absoluteBasePath
     await traverser.traverse(absoluteBasePath);
 
-    // Normalize the results from the spy
     return normalizeAndSort(consoleLogSpy.mock.calls);
 };
 
-// Convenience runner for relative paths
-export const runTraverseRelative = async (
-    startPath: string, // Allow specifying start path
+// NEW Default Runner (Relative Paths) - replaces old runTraverseRelative
+export const runTraverse = async (
+    startPath: string,
     consoleLogSpy: jest.SpyInstance,
     options: Partial<TraverseOptions> = {}
 ): Promise<string[]> => {
-    // Ensure relativePaths: true is passed correctly
-    // runTraverse will handle merging other options and defaults
-    return await runTraverse(startPath, consoleLogSpy, { ...options, relativePaths: true });
+    // Ensures relativePaths: true unless explicitly overridden in options
+    // This aligns with the new default behavior of the CLI.
+    return await runTraverseBase(startPath, consoleLogSpy, { ...options, relativePathsOverride: options.relativePaths ?? true });
 };
+
+// NEW Absolute Path Runner - replaces old runTraverse
+export const runTraverseAbsolute = async (
+    startPath: string,
+    consoleLogSpy: jest.SpyInstance,
+    options: Partial<TraverseOptions> = {}
+): Promise<string[]> => {
+    // Force relativePaths: false
+    return await runTraverseBase(startPath, consoleLogSpy, { ...options, relativePathsOverride: false });
+};
+
+// --- END: Helper Refactoring ---

@@ -32,120 +32,116 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
     });
 
     describe('Basic Execution', () => {
-        // Test without --relative flag - Expect ABSOLUTE paths
-        it('should run with no arguments and find items in current dir (excluding defaults, absolute paths)', () => {
+        // Test default behavior (relative paths, prefixed with ./)
+        it('should run with no arguments and find items in current dir (excluding defaults, relative paths)', () => {
             const result = runCli([], realTestDir); // Run CLI using the REAL path for CWD
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
-            // Construct expected paths using the REAL path
+            // Expect relative paths prefixed with './'
             const expected = [
-                realTestDir, // Use real path for the base
-                path.join(realTestDir, '.hiddenfile'),
-                path.join(realTestDir, 'doc.txt'),
-                path.join(realTestDir, 'emptyDir'),
-                path.join(realTestDir, 'image.jpg'),
-                path.join(realTestDir, 'subdir'),
-                path.join(realTestDir, 'subdir', 'nested.js'),
+                '.',
+                './.hiddenfile',
+                './doc.txt',
+                './emptyDir',
+                './image.jpg',
+                './subdir',
+                './subdir/nested.js',
             ].sort();
-            // normalizeAndSort just normalizes separators and sorts
+            // normalizeAndSort handles separators and sorts
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
-        // Test with specific dir - NO --relative flag - Expect ABSOLUTE paths within
-        it('should run with a specific directory path argument (absolute paths)', () => {
-            const result = runCli(['subdir'], realTestDir); // Run CLI using the REAL path for CWD
+        // Test with specific dir argument - expect paths relative to that dir
+        it('should run with a specific directory path argument (relative paths)', () => {
+            const result = runCli(['subdir'], realTestDir); // Run CLI using the REAL path for CWD, starting in 'subdir'
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
-            // Construct expected paths using the REAL path
+            // Expect paths relative to 'subdir', prefixed with './'
             const expected = [
-                path.join(realTestDir, 'subdir'), // Use real path
-                path.join(realTestDir, 'subdir', 'nested.js'),
+                '.', // The 'subdir' itself relative to its base
+                './nested.js',
             ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
-        // Test with spaces in name - NO --relative - Expect ABSOLUTE paths
-        it('should run targeting a directory with spaces in its name (absolute paths)', async () => {
+        // Test with spaces in name - expect paths relative to that dir
+        it('should run targeting a directory with spaces in its name (relative paths)', async () => {
             const dirWithSpacesOriginal = path.join(testDir, 'dir with spaces');
-            const dirWithSpacesReal = path.join(realTestDir, 'dir with spaces'); // Real path counterpart
+            // const dirWithSpacesReal = path.join(realTestDir, 'dir with spaces'); // Real path not needed for relative assertion
             await fs.ensureDir(dirWithSpacesOriginal);
             await fs.writeFile(path.join(dirWithSpacesOriginal, 'file inside spaces.txt'), 'space content');
 
-            const result = runCli(['dir with spaces'], realTestDir); // Run CLI using the REAL path for CWD
+            const result = runCli(['dir with spaces'], realTestDir); // Run CLI using the REAL path for CWD, start in 'dir with spaces'
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
-            // Construct expected paths using the REAL path
+            // Expect paths relative to 'dir with spaces'
             const expected = [
-                dirWithSpacesReal, // Use real path
-                path.join(dirWithSpacesReal, 'file inside spaces.txt')
+                '.',
+                './file inside spaces.txt'
             ].sort();
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
-        it('should exit with status 0 on successful execution', () => {
+        it('should exit with status 0 on successful execution (default relative)', () => {
             const result = runCli([], realTestDir); // Use real path
             expect(result.status).toBe(0);
         });
 
-        it('should output results to stdout', () => {
+        it('should output results to stdout (default relative)', () => {
             const result = runCli([], realTestDir); // Use real path
             expect(result.stdout).toBeDefined();
-            // Check length relative to expected output count
-            expect(result.stdoutLines.length).toBe(7); // Based on the basic structure and default excludes
+            // Check length relative to expected output count (still 7 with relative paths)
+            expect(result.stdoutLines.length).toBe(7);
         });
 
-        it('should output nothing to stderr on successful execution', () => {
+        it('should output nothing to stderr on successful execution (default relative)', () => {
             const result = runCli([], realTestDir); // Use real path
             expect(result.stderr).toBe('');
         });
     });
 
     describe('Path Handling', () => {
-        // Test with "." - NO --relative - Expect ABSOLUTE paths
-        it('should handle "." as the current directory (absolute paths)', () => {
+        // Test with "." - Expect RELATIVE paths (default)
+        it('should handle "." as the current directory (relative paths)', () => {
             const result = runCli(['.'], realTestDir); // Run CLI using the REAL path for CWD
             expect(result.status).toBe(0);
             expect(result.stderr).toBe('');
-             // Construct expected paths using the REAL path
+             // Expect relative paths prefixed with './'
              const expected = [
-                realTestDir, // Use real path
-                path.join(realTestDir, '.hiddenfile'),
-                path.join(realTestDir, 'doc.txt'),
-                path.join(realTestDir, 'emptyDir'),
-                path.join(realTestDir, 'image.jpg'),
-                path.join(realTestDir, 'subdir'),
-                path.join(realTestDir, 'subdir', 'nested.js'),
+                 '.',
+                 './.hiddenfile',
+                 './doc.txt',
+                 './emptyDir',
+                 './image.jpg',
+                 './subdir',
+                 './subdir/nested.js',
             ].sort();
              expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
         });
 
-        // Test providing a FILE as input path - should fail
+        // Test providing a FILE as input path - should fail (no change needed)
         it('should fail if start path is a relative file path', () => {
             const relativeFilePath = 'doc.txt';
             // Run the CLI using the real path as CWD so relative resolution is consistent
             const result = runCli([relativeFilePath], realTestDir);
             expect(result.status).not.toBe(0); // Expect non-zero status
 
-            // --- FIX START ---
             const expectedResolvedPath = path.resolve(realTestDir, relativeFilePath); // Use realTestDir for resolution
             // Check for the outer wrapper message AND the inner "is not a directory" part
             expect(result.stderr).toContain(`Error accessing start path "${relativeFilePath}" (resolved to "${expectedResolvedPath}")`);
             expect(result.stderr).toContain(`is not a directory.`);
-            // --- FIX END ---
         });
 
-        // Test providing an absolute FILE path - should fail
+        // Test providing an absolute FILE path - should fail (no change needed)
         it('should fail if start path is an absolute file path', () => {
             const absolutePath = path.join(realTestDir, 'doc.txt'); // Use real path for consistency
             // Running from realTestDir, path is absolute
             const result = runCli([absolutePath], realTestDir);
             expect(result.status).not.toBe(0); // Expect non-zero status
 
-            // --- FIX START ---
             // Check for the outer wrapper message AND the inner "is not a directory" part
             expect(result.stderr).toContain(`Error accessing start path "${absolutePath}" (resolved to "${absolutePath}")`);
             expect(result.stderr).toContain(`is not a directory.`);
-            // --- FIX END ---
         });
     });
 });

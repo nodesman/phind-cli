@@ -46,8 +46,8 @@ In essence, `phind` is designed to be the `find` command you *wish* you had – 
 *   🔍 **Flexible Filtering:** Filter by name/path (`--name`), type (`--type`), and depth (`--maxdepth`).
 *   🚫 **Powerful Exclusions:** Exclude patterns via CLI (`--exclude`) or a global ignore file.
 *   ⚙️ **Configurable:** Skip global ignores (`--skip-global-ignore`), control case sensitivity (`--ignore-case`).
-*   📄 **Output Control:** Print absolute or relative paths (`--relative`).
-*   🚀 **Modern & Performant:** Built with TypeScript and modern Node.js APIs.
+*   📄 **Output Control:** Print relative (default) or absolute paths (`--relative=false`).
+*   🚀 **Modern & Performant:** Built with TypeScript and modern Node.js APIs. (Defaults to relative paths!)
 
 ## Installation
 
@@ -154,12 +154,13 @@ Here is a detailed breakdown of every available command-line option:
 
 ### `--relative` / `-r`
 
-*   **Description:** Print paths relative to the starting directory.
+*   **Description:** Print paths relative to the starting directory (default). Use `--relative=false` for absolute paths.
 *   **Type:** `boolean`
-*   **Default:** `false`
+*   **Default:** `true`
+*   **Default Description:** true (relative paths)
 *   **Details:**
-    *   Default (`false`): Prints absolute paths (e.g., `/home/user/project/src/file.ts`).
-    *   `--relative` (`true`): Prints paths relative to the `[path]` argument (e.g., `src/file.ts`). The starting directory itself is represented as `.`.
+    *   **Default (`true`):** Prints paths relative to the `[path]` argument (e.g., `./src/file.ts`). The starting directory itself is represented as `.`. Paths are prefixed with `./` unless they start with `../`.
+    *   `--relative=false`: Use this explicitly to print absolute paths (e.g., `/home/user/project/src/file.ts`).
 
 ---
 
@@ -262,8 +263,36 @@ cd my_project
 phind
 ```
 
-*Output (Absolute Paths, node_modules & .git excluded):*
+*Output (Relative Paths - Default, node_modules & .git excluded):*
 
+```
+.
+./.env
+./README.md
+./config.yaml
+./dist
+./dist/bundle.js
+./package.json
+./public
+./public/index.html
+./public/styles.css
+./src
+./src/components
+./src/components/Button.tsx
+./src/main.ts
+./src/utils
+./src/utils/helper.ts
+./test
+./test/main.test.ts
+./test/utils.test.js
+```
+
+**b. Find all items using absolute paths**
+```bash
+cd my_project
+phind --relative=false
+```
+*Output (Absolute Paths):*
 ```
 /path/to/my_project
 /path/to/my_project/.env
@@ -286,37 +315,6 @@ phind
 /path/to/my_project/test/utils.test.js
 ```
 
-**b. Find all items using relative paths**
-
-```bash
-cd my_project
-phind --relative # or phind -r
-```
-
-*Output (Relative Paths, node_modules & .git excluded):*
-
-```
-.
-.env
-README.md
-config.yaml
-dist
-dist/bundle.js
-package.json
-public
-public/index.html
-public/styles.css
-src
-src/components
-src/components/Button.tsx
-src/main.ts
-src/utils
-src/utils/helper.ts
-test
-test/main.test.ts
-test/utils.test.js
-```
-
 **c. Find all items starting in a specific subdirectory (`src`)**
 
 ```bash
@@ -324,8 +322,23 @@ cd my_project
 phind src
 ```
 
-*Output (Absolute Paths):*
+*Output (Relative Paths - Default):*
 
+```
+./src
+./src/components
+./src/components/Button.tsx
+./src/main.ts
+./src/utils
+./src/utils/helper.ts
+```
+
+**d. Find items in `src` using absolute paths**
+```bash
+cd my_project
+phind src --relative=false
+```
+*Output (Absolute Paths):*
 ```
 /path/to/my_project/src
 /path/to/my_project/src/components
@@ -343,73 +356,67 @@ phind src
 
 ```bash
 cd my_project
-phind --name "*.ts" -r # Using relative for brevity
+phind --name "*.ts" # Relative is default
 ```
 
 *Output:*
 
 ```
-src/main.ts
-src/utils/helper.ts
-test/main.test.ts
+./src/main.ts
+./src/utils/helper.ts
+./test/main.test.ts
 ```
 
 **b. Find all TypeScript and TSX files**
 
 ```bash
 cd my_project
-phind --name "*.ts" --name "*.tsx" -r
+phind --name "*.ts" --name "*.tsx" # Relative is default
 ```
 
 *Output:*
 
 ```
-src/components/Button.tsx
-src/main.ts
-src/utils/helper.ts
-test/main.test.ts
+./src/components/Button.tsx
+./src/main.ts
+./src/utils/helper.ts
+./test/main.test.ts
 ```
 
 **c. Find specific configuration files**
 
 ```bash
 cd my_project
-phind --name package.json --name config.yaml -r
+phind --name package.json --name config.yaml # Relative is default
 ```
 
 *Output:*
 
 ```
-config.yaml
-package.json
+./config.yaml
+./package.json
 ```
 
 **d. Find all items within the `src/utils` directory**
-
 ```bash
 cd my_project
-phind --name "src/utils/**" -r
+phind --name "src/utils/**" # Relative is default
 ```
-
 *Output:*
-
 ```
-src/utils/helper.ts
+./src/utils/helper.ts
 ```
 *(Note: `src/utils/**` matches items *inside* `utils`, not the directory itself)*
 
 **e. Find the `src/utils` directory itself and its contents**
-
 ```bash
 cd my_project
-phind --name "src/utils" --name "src/utils/**" -r
+phind --name "src/utils" --name "src/utils/**" # Relative is default
 ```
-
 *Output:*
-
 ```
-src/utils
-src/utils/helper.ts
+./src/utils
+./src/utils/helper.ts
 ```
 
 ---
@@ -420,57 +427,50 @@ src/utils/helper.ts
 
 ```bash
 cd my_project
-phind -t f -r
+phind -t f # Relative is default
 ```
 
-*Output (All files, excluding default ignores):*
-
+*Output (Relative paths, All files, excluding default ignores):*
 ```
-.env
-README.md
-config.yaml
-dist/bundle.js
-package.json
-public/index.html
-public/styles.css
-src/components/Button.tsx
-src/main.ts
-src/utils/helper.ts
-test/main.test.ts
-test/utils.test.js
+./.env
+./README.md
+./config.yaml
+./dist/bundle.js
+./package.json
+./public/index.html
+./public/styles.css
+./src/components/Button.tsx
+./src/main.ts
+./src/utils/helper.ts
+./test/main.test.ts
+./test/utils.test.js
 ```
 
 **b. Find only directories**
-
 ```bash
 cd my_project
-phind -t d -r
+phind -t d # Relative is default
 ```
-
-*Output (All directories, excluding default ignores):*
-
+*Output (Relative paths, All directories, excluding default ignores):*
 ```
 .
-dist
-public
-src
-src/components
-src/utils
-test
+./dist
+./public
+./src
+./src/components
+./src/utils
+./test
 ```
 
 **c. Find only JavaScript files (`*.js`)**
-
 ```bash
 cd my_project
-phind -t f --name "*.js" -r
+phind -t f --name "*.js" # Relative is default
 ```
-
 *Output:*
-
 ```
-dist/bundle.js
-test/utils.test.js
+./dist/bundle.js
+./test/utils.test.js
 ```
 
 ---
@@ -478,54 +478,45 @@ test/utils.test.js
 ### 4. Filtering by Depth (`--maxdepth` / `-d`)
 
 **a. Find only items in the immediate directory (depth 0)**
-
 ```bash
 cd my_project
-phind --maxdepth 0 -r
+phind --maxdepth 0 # Relative is default
 ```
-
 *Output:*
-
 ```
 .
 ```
 
 **b. Find items at depth 0 and 1**
-
 ```bash
 cd my_project
-phind --maxdepth 1 -r
+phind --maxdepth 1 # Relative is default
 ```
-
 *Output (Top-level files/dirs, excluding default ignores):*
-
 ```
 .
-.env
-README.md
-config.yaml
-dist
-package.json
-public
-src
-test
+./.env
+./README.md
+./config.yaml
+./dist
+./package.json
+./public
+./src
+./test
 ```
 
 **c. Find only directories at depth 0 and 1**
-
 ```bash
 cd my_project
-phind -t d --maxdepth 1 -r
+phind -t d --maxdepth 1 # Relative is default
 ```
-
 *Output:*
-
 ```
 .
-dist
-public
-src
-test
+./dist
+./public
+./src
+./test
 ```
 
 ---
@@ -533,148 +524,120 @@ test
 ### 5. Excluding Patterns (`--exclude` / `-e`)
 
 **a. Exclude all test files (`*.test.*`)**
-
 ```bash
 cd my_project
-phind --exclude "*.test.*" -r
+phind --exclude "*.test.*" # Relative is default
 ```
-
-*(Output will include everything except `test/main.test.ts` and `test/utils.test.js`)*
+*(Output will include everything except `./test/main.test.ts` and `./test/utils.test.js`)*
 
 **b. Exclude the `public` directory (pruning)**
-
 ```bash
 cd my_project
-phind --exclude public -r
+phind --exclude public # Relative is default
 ```
-
-*(Output will include everything except the `public` directory and its contents: `index.html`, `styles.css`)*
+*(Output will include everything except `./public` directory and its contents: `./public/index.html`, `./public/styles.css`)*
 
 **c. Exclude CSS files and the `dist` directory**
-
 ```bash
 cd my_project
-phind --exclude "*.css" --exclude dist -r
+phind --exclude "*.css" --exclude dist # Relative is default
 ```
-
-*(Output will not include `public/styles.css`, the `dist` directory, or `dist/bundle.js`)*
+*(Output will not include `./public/styles.css`, the `./dist` directory, or `./dist/bundle.js`)*
 
 **d. Find all JS files, but exclude those in the `test` directory**
-
 ```bash
 cd my_project
-phind --name "*.js" --exclude "test/**" -t f -r
+phind --name "*.js" --exclude "test/**" -t f # Relative is default
 ```
-
 *Output:*
-
 ```
-dist/bundle.js
+./dist/bundle.js
 ```
-*(Note: `test/utils.test.js` is excluded because it's inside the `test` directory)*
+*(Note: `./test/utils.test.js` is excluded because it's inside the `test` directory)*
 
 ---
 
 ### 6. Case Insensitivity (`--ignore-case` / `-i`)
 
 **a. Find `readme.md` case-insensitively**
-
 ```bash
 cd my_project
 # Assuming file is README.md
-phind --name readme.md -i -r
+phind --name readme.md -i # Relative is default
 ```
-
 *Output:*
-
 ```
-README.md
+./README.md
 ```
 
 **b. Find all TS/TSX files, excluding `button.tsx` case-insensitively**
-
 ```bash
 cd my_project
-phind --name "*.[tT][sS]x?" -i --exclude "button.tsx" -r
+phind --name "*.[tT][sS]x?" -i --exclude "button.tsx" # Relative is default
 ```
-
 *Output:*
-
 ```
-src/main.ts
-src/utils/helper.ts
-test/main.test.ts
+./src/main.ts
+./src/utils/helper.ts
+./test/main.test.ts
 ```
-*(Note: `src/components/Button.tsx` is excluded)*
+*(Note: `./src/components/Button.tsx` is excluded)*
 
 ---
 
 ### 7. Global Ignore File Interaction
 
 **a. Run normally (assuming global file excludes `dist/` and `.env`)**
-
 ```bash
 cd my_project
 # Assumes global ignore contains 'dist/' and '.env'
-phind -r
+phind # Relative is default
 ```
-
-*(Output will exclude `node_modules`, `.git` (default), AND `dist/`, `.env` (global))*
+*(Output will exclude `node_modules`, `.git` (default), AND `dist/`, `.env` (global), paths will be relative)*
 
 **b. Skip the global ignore file**
-
 ```bash
 cd my_project
 # Assumes global ignore contains 'dist/' and '.env'
-phind --skip-global-ignore -r
+phind --skip-global-ignore # Relative is default
 ```
-
-*(Output will exclude `node_modules`, `.git` (default) but will **include** `dist/` and `.env` because the global file was skipped)*
+*(Output will exclude `node_modules`, `.git` (default) but will **include** `./dist/` and `./.env` because the global file was skipped, paths will be relative)*
 
 **c. Combine global, default, and CLI excludes**
-
 ```bash
 cd my_project
 # Assumes global ignore contains 'dist/' and '.env'
-phind --exclude "*.yaml" --skip-global-ignore=false -r # Explicitly use global ignore
+phind --exclude "*.yaml" --skip-global-ignore=false # Relative is default
 ```
-
-*(Output excludes `node_modules`, `.git` (default), `dist/`, `.env` (global), AND `config.yaml` (CLI))*
+*(Output excludes `node_modules`, `.git` (default), `dist/`, `.env` (global), AND `./config.yaml` (CLI), paths will be relative)*
 
 ---
 
 ### 8. Overriding Default Excludes
 
 **a. Find items *inside* `node_modules`**
-
 *By default, `node_modules` is pruned. To find something inside, you need an explicit `--name` pattern that targets the content.*
-
 ```bash
 cd my_project
 # Find the specific library index file
-phind --name "node_modules/some_lib/index.js" -r
+phind --name "node_modules/some_lib/index.js" # Relative is default
 ```
-
 *Output:*
-
 ```
-node_modules/some_lib/index.js
+./node_modules/some_lib/index.js
 ```
 *(The default exclusion of `node_modules` directory printing/pruning is overridden because a specific include pattern targets content inside it)*
 
 **b. List the `node_modules` directory itself and its contents**
-
 ```bash
 cd my_project
-phind --name node_modules --name "node_modules/**" -r
+phind --name node_modules --name "node_modules/**" # Relative is default
 ```
-
 *Output:*
-
 ```
-node_modules
-node_modules/some_lib
-node_modules/some_lib/index.js
+./node_modules
+./node_modules/some_lib
+./node_modules/some_lib/index.js
 ```
 *(Here, `--name node_modules` explicitly includes the directory, overriding the default exclusion for listing it, and `--name "node_modules/**"` includes the contents)*
 
@@ -692,7 +655,7 @@ node_modules/some_lib/index.js
 | **Type Filter**     | ✅ Simple (`-t f`, `-t d`)                       | ✅ `-type f`, `-type d`                          | ⚠️ Requires attribute check (`/A:D`, `/A:-D`) |
 | **Depth Limit**     | ✅ Simple (`-d N`)                               | ✅ `-maxdepth N`                               | ❌ No direct equivalent         |
 | **Case Ignore**     | ✅ Simple (`-i`)                                 | ✅ `-iname`, `-iregex`                         | ✅ `/S` searches, but no case flag |
-| **Relative Paths**  | ✅ Simple (`-r`)                                 | ⚠️ Requires `-printf '%P\n'` or similar       | ✅ Output can be relative       |
+| **Path Style**      | ✅ Relative Default (`./file`), `--relative=false` for absolute | ⚠️ Relative Default (`./file`), complex absolute | ✅ Relative Default (`file`) |
 | **Ease of Use**     | ⭐⭐⭐⭐⭐ (High, Developer-focused)             | ⭐⭐ (Medium-High, Steeper curve)              | ⭐⭐⭐ (Medium, Simpler but limited) |
 
 ## Development
