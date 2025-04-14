@@ -32,6 +32,7 @@ export const testStructure = {
     },
     '.git': { 'config': 'git config', 'HEAD': 'ref: refs/heads/main' },
     'node_modules': { 'some_package': { 'index.js': 'code' } },
+    '.gradle': { 'caches': { 'modules-2': { 'files-2.1': {} } }, 'wrapper': { 'gradle-wrapper.jar': '' } },
     'emptyDir': null,
     'dir with spaces': { 'file inside spaces.txt': 'space content' },
     'unreadable_dir': {}
@@ -123,7 +124,7 @@ const runTraverseBase = async (
     consoleLogSpy: jest.SpyInstance,
     options: Partial<TraverseOptions> & { relativePathsOverride?: boolean } // Allow override for specific tests
 ): Promise<string[]> => {
-    const hardcodedDefaults = ['node_modules', '.git'];
+    const hardcodedDefaults = ['node_modules', '.git', '.gradle'];
 
     // Determine the final relativePaths setting
     const relativePaths = options.relativePathsOverride ?? true; // Default to RELATIVE now

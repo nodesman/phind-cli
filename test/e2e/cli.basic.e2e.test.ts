@@ -49,6 +49,8 @@ describe('CLI E2E - Basic Execution & Path Handling', () => {
             ].sort();
             // normalizeAndSort handles separators and sorts
             expect(normalizeAndSort(result.stdoutLines)).toEqual(expected);
+             // Add check for .gradle if it was added to this test's structure
+             expect(result.stdoutLines).not.toContain('./.gradle');
         });
 
         // Test with specific dir argument - expect paths relative to that dir

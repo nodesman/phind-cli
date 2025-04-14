@@ -171,7 +171,7 @@ describe('CLI E2E - Other Options (Case, Relative, Help)', () => {
             expect(result.status).toBe(0);
             // Adjust regex patterns to match yargs output and new defaults
             expect(result.stdout).toMatch(/--name\s+.*Glob pattern\(s\).*\[array].*\[default: "\*" \(all files\/dirs\)\]/s);
-            expect(result.stdout).toMatch(/--exclude\s+.*Glob pattern\(s\).*\[array].*\[default: "node_modules", ".git"\]/s);
+            expect(result.stdout).toMatch(/--exclude\s+.*Glob pattern\(s\).*\[array].*\[default: "node_modules", ".git", ".gradle"\]/s);
             expect(result.stdout).toMatch(/--maxdepth\s+.*Maximum directory levels.*\[number].*\[default: Infinity]/s);
             // Check the updated relative option default and description
             expect(result.stdout).toMatch(/--relative\s+.*Print paths relative.*\(default\).*Use --relative=false for absolute paths\..*\[boolean].*\[default: true \(relative paths\)\]/s);

@@ -21,7 +21,7 @@ The standard `find` command, while powerful, presents several challenges, especi
     *   Excluding directories effectively (pruning) often involves cumbersome patterns like `-path './node_modules' -prune -o -print`.
 
 3.  **Lack of Sensible Defaults for Developers:**
-    *   **This is a major pain point.** When searching in a typical software project, you almost *never* want to see results from `node_modules`, `.git`, `build` directories, etc. Standard `find` requires you to *explicitly* exclude these *every single time*. This adds significant boilerplate to common search commands.
+    *   **This is a major pain point.** When searching in a typical software project, you almost *never* want to see results from `node_modules`, `.git`, `.gradle`, `build` directories, etc. Standard `find` requires you to *explicitly* exclude these *every single time*. This adds significant boilerplate to common search commands.
 4.  **No User-Level Configuration:**
     *   Beyond project-specific ignores (like `.gitignore`, which `find` doesn't natively understand anyway), there's no standard way to tell `find` to *always* ignore certain patterns across *all* projects. Think about system files (`.DS_Store`, `Thumbs.db`), editor configuration (`.vscode/`, `.idea/`), temporary files (`*.bak`, `*.swp`), or compiled artifacts (`*.pyc`, `*.o`). With standard `find`, you must *manually add exclusion flags for these user-specific or system-specific nuisances every single time you run a command*, or resort to complex shell aliases or wrapper scripts.
 
@@ -30,7 +30,7 @@ The standard `find` command, while powerful, presents several challenges, especi
 `phind` aims to solve these problems by providing:
 
 *   **True Cross-Platform Compatibility:** Runs consistently on Linux, macOS, and Windows with the same command and options.
-*   **Sensible Developer Defaults:** **Crucially, `phind` automatically excludes common directories like `node_modules` and `.git` by default.** This drastically simplifies finding relevant project files without manual exclusion flags in most cases.
+*   **Sensible Developer Defaults:** **Crucially, `phind` automatically excludes common directories like `node_modules`, `.git`, and `.gradle` by default.** This drastically simplifies finding relevant project files without manual exclusion flags in most cases.
 *   **Intuitive Glob Patterns:** Uses familiar glob patterns (like those in `.gitignore`) for both including (`--name`) and excluding (`--exclude`) files and directories, powered by `micromatch`.
 *   **Simplified Options:** Offers clear, easy-to-understand flags for common tasks like filtering by type (`-t f`/`-t d`), limiting depth (`-d`), case-insensitive search (`-i`), and relative path output (`-r`).
 *   **Global Ignore File:** Supports a global ignore file (`~/.config/phind/ignore` or platform equivalent) for persistent, user-defined excludes across all projects.
@@ -41,7 +41,7 @@ In essence, `phind` is designed to be the `find` command you *wish* you had – 
 ## Key Features
 
 *   ✅ **Cross-Platform:** Works identically on Windows, macOS, and Linux.
-*   🧠 **Smart Defaults:** Automatically ignores `node_modules` and `.git`.
+*   🧠 **Smart Defaults:** Automatically ignores `node_modules`, `.git`, and `.gradle`.
 *   ✨ **Intuitive Syntax:** Uses simple flags and familiar glob patterns.
 *   🔍 **Flexible Filtering:** Filter by name/path (`--name`), type (`--type`), and depth (`--maxdepth`).
 *   🚫 **Powerful Exclusions:** Exclude patterns via CLI (`--exclude`) or a global ignore file.
@@ -105,7 +105,7 @@ Here is a detailed breakdown of every available command-line option:
 *   **Description:** Glob pattern(s) to exclude files or directories. Also reads patterns from the global ignore file unless `--skip-global-ignore` is used. You can specify this option multiple times.
 *   **Type:** `string` (array)
 *   **Default:** `[]` (CLI arguments default to none, but hardcoded defaults and global ignores are applied)
-*   **Default Description:** `"`node_modules`", "`".git`"` (These are the hardcoded defaults that are always added unless overridden by specific includes).
+*   **Default Description:** `"`node_modules`", "`".git`", "`".gradle`"` (These are the hardcoded defaults that are always added unless overridden by specific includes).
 *   **Details:** Patterns are matched similarly to `--name` (base name, absolute path, relative path). If a directory matches an exclude pattern, it is *pruned* – `phind` will not descend into it. This is highly efficient for skipping large directories like `node_modules`. Exclude patterns take priority over include patterns. The final list of excludes combines hardcoded defaults (`node_modules`, `.git`), patterns from the global ignore file, and patterns provided via the CLI `--exclude` flag.
 
 ---
@@ -115,7 +115,7 @@ Here is a detailed breakdown of every available command-line option:
 *   **Description:** Do not load patterns from the global ignore file.
 *   **Type:** `boolean`
 *   **Default:** `false`
-*   **Details:** Use this flag if you want to temporarily ignore your global configuration (see [Global Ignore File](#global-ignore-file) section below) and rely only on the hardcoded defaults (`node_modules`, `.git`) and any patterns provided via `--exclude`.
+*   **Details:** Use this flag if you want to temporarily ignore your global configuration (see [Global Ignore File](#global-ignore-file) section below) and rely only on the hardcoded defaults (`node_modules`, `.git`, `.gradle`) and any patterns provided via `--exclude`.
 
 ---
 

@@ -26,8 +26,10 @@ describe('DirectoryTraverser - Core Functionality', () => {
         // Should NOT contain default excludes
         expect(results).not.toContain(path.join(testDir, '.git'));
         expect(results).not.toContain(path.join(testDir, 'node_modules'));
+        expect(results).not.toContain(path.join(testDir, '.gradle'));
         expect(results).not.toContain(path.join(testDir, '.git', 'config'));
         expect(results).not.toContain(path.join(testDir, 'node_modules', 'some_package', 'index.js'));
+        expect(results).not.toContain(path.join(testDir, '.gradle', 'caches'));
     });
 
     it('should find all items by default when no options are restrictive (relative paths, default excludes applied)', async () => {
@@ -43,6 +45,7 @@ describe('DirectoryTraverser - Core Functionality', () => {
          // Should NOT contain default excludes (prefixed)
         expect(results).not.toContain('./.git');
         expect(results).not.toContain('./node_modules');
+        expect(results).not.toContain('./.gradle');
         expect(results).not.toContain('./.git/config');
         expect(results).not.toContain('./node_modules/some_package/index.js');
     });

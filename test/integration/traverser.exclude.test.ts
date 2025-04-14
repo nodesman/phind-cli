@@ -24,6 +24,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain(path.join(testDir, 'dir1', 'file3.txt'));
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
         expect(results).not.toContain(path.join(testDir, 'node_modules')); // Default exclude check
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Default exclude check
     });
 
     it('should exclude files matching a simple glob pattern (*.log) (relative)', async () => {
@@ -36,6 +37,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain('./dir1/file3.txt');
         expect(results).not.toContain('.git'); // Default exclude check
         expect(results).not.toContain('node_modules'); // Default exclude check
+		expect(results).not.toContain('.gradle'); // Default exclude check
     });
 
     it('should exclude items matching multiple glob patterns (*.log, *.tmp) (absolute)', async () => {
@@ -49,6 +51,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain(path.join(testDir, 'dir1', 'file3.txt'));
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
         expect(results).not.toContain(path.join(testDir, 'node_modules')); // Default exclude check
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Default exclude check
     });
 
     it('should exclude items matching multiple glob patterns (*.log, *.tmp) (relative)', async () => {
@@ -62,6 +65,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain('./dir1/file3.txt');
         expect(results).not.toContain('.git'); // Default exclude check
         expect(results).not.toContain('node_modules'); // Default exclude check
+		expect(results).not.toContain('.gradle'); // Default exclude check
     });
 
     it('should exclude items matching a pattern with case sensitivity by default (absolute)', async () => {
@@ -70,6 +74,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain(path.join(testDir, 'dir2', 'image_upper.JPG')); // Use unique name
         // The presence of 'image.jpg' depends on filesystem case sensitivity and readdir order - avoid asserting its presence.
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Default exclude check
     });
 
     it('should exclude items matching a pattern with case sensitivity by default (relative)', async () => {
@@ -78,6 +83,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain('./dir2/image_upper.JPG'); // Use unique name
         // The presence of 'image.jpg' depends on filesystem case sensitivity and readdir order - avoid asserting its presence.
         expect(results).not.toContain('.git'); // Default exclude check
+		expect(results).not.toContain('.gradle'); // Default exclude check
     });
 
     it('should exclude hidden files/dirs when pattern explicitly matches them (.*) (absolute)', async () => {
@@ -86,6 +92,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain(path.join(testDir, '.hiddenfile'));
         expect(results).not.toContain(path.join(testDir, '.hiddenDir'));
         expect(results).not.toContain(path.join(testDir, '.git')); // Excluded by both default and pattern
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Excluded by both default and pattern
         expect(results).toContain(path.join(testDir, 'file1.txt')); // others present
         expect(results).toContain(path.join(testDir, 'dir1'));
         expect(results).not.toContain(path.join(testDir, 'node_modules')); // Default excluded
@@ -97,6 +104,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain('./.hiddenfile');
         expect(results).not.toContain('./.hiddenDir');
         expect(results).not.toContain('.git'); // Excluded by both default and pattern
+		expect(results).not.toContain('.gradle'); // Excluded by both default and pattern
         expect(results).toContain('./file1.txt'); // others present
         expect(results).toContain('./dir1');
         expect(results).not.toContain('node_modules'); // Default excluded
@@ -109,6 +117,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain(path.join(testDir, '.hiddenDir'));
         expect(results).not.toContain(path.join(testDir, 'dir1', 'subDir1', '.hiddensub'));
         expect(results).not.toContain(path.join(testDir, '.git')); //Excluded by default and pattern
+		expect(results).not.toContain(path.join(testDir, '.gradle')); //Excluded by default and pattern
         expect(results).toContain(path.join(testDir, 'file1.txt')); // others present
         expect(results).toContain(path.join(testDir, 'dir1'));
         expect(results).not.toContain(path.join(testDir, 'node_modules')); // Default excluded
@@ -121,6 +130,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain('./.hiddenDir');
         expect(results).not.toContain('./dir1/subDir1/.hiddensub');
         expect(results).not.toContain('.git'); //Excluded by default and pattern
+		expect(results).not.toContain('.gradle'); //Excluded by default and pattern
         expect(results).toContain('./file1.txt'); // others present
         expect(results).toContain('./dir1');
         expect(results).not.toContain('node_modules'); // Default excluded
@@ -133,6 +143,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain(path.join(testDir, 'file1.txt'));
         expect(results).toContain(path.join(testDir, 'dir1', 'file3.txt'));
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Default exclude check
     });
 
     it('should exclude items based on matching the full relative path', async () => {
@@ -142,6 +153,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain('./file1.txt');
         expect(results).toContain('./dir1/file3.txt');
         expect(results).not.toContain('.git'); // Default exclude check
+		expect(results).not.toContain('.gradle'); // Default exclude check
     });
 
     it('should exclude items matching the base name', async () => {
@@ -149,6 +161,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain(path.join(testDir, 'file1.txt'));
         expect(results).toContain(path.join(testDir, 'file2.log')); // Ensure other files are still present
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Default exclude check
     });
 
     // Add more tests as needed, e.g., for pruning directories
@@ -161,6 +174,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain(path.join(testDir, 'dir2')); // Ensure other dirs are present
         expect(results).toContain(path.join(testDir, 'dir2', 'file5.log'));
         expect(results).not.toContain(path.join(testDir, '.git')); // Default exclude check
+		expect(results).not.toContain(path.join(testDir, '.gradle')); // Default exclude check
     });
 
     it('should prune entire directories matching exclude pattern (relative)', async () => {
@@ -172,6 +186,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).toContain('./dir2'); // Ensure other dirs are present
         expect(results).toContain('./dir2/file5.log');
         expect(results).not.toContain('.git'); // Default exclude check
+		expect(results).not.toContain('.gradle'); // Default exclude check
     });
 
     // Test Override Logic (Important!)
@@ -194,6 +209,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
 
         // Should still exclude other defaults like .git (unless also explicitly included)
         expect(results).not.toContain(path.join(testDir, '.git'));
+		expect(results).not.toContain(path.join(testDir, '.gradle'));
     });
 
      // Test case 2: Include a pattern that matches a default-excluded directory name (relative)
@@ -211,6 +227,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
 
          // Should still exclude other defaults like .git
          expect(results).not.toContain('.git');
+		 expect(results).not.toContain('.gradle');
 
          // Test with '*' added back - results should be the same for node_modules part
          spies.consoleLogSpy.mockClear();
@@ -223,6 +240,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          expect(resultsWithStar).toContain('./node_modules/some_package');
          expect(resultsWithStar).toContain('./node_modules/some_package/index.js');
          expect(resultsWithStar).not.toContain('.git'); // Still default excluded
+		 expect(resultsWithStar).not.toContain('.gradle'); // Still default excluded
 
      });
 
@@ -255,6 +273,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          expect(resultsWithStar).toContain(packagePath);
          // Should still exclude other defaults
          expect(resultsWithStar).not.toContain(path.join(testDir, '.git'));
+		 expect(resultsWithStar).not.toContain(path.join(testDir, '.gradle'));
          // Should contain other items matched by '*'
          expect(resultsWithStar).toContain(path.join(testDir, 'file1.txt'));
          expect(resultsWithStar).toContain(path.join(testDir, 'dir1'));
@@ -285,6 +304,7 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
          expect(resultsWithStar).toContain('./node_modules/some_package');
          // Should still exclude other defaults
          expect(resultsWithStar).not.toContain('.git');
+		 expect(resultsWithStar).not.toContain('.gradle');
          // Should contain '.' and other items matching '*'
          expect(resultsWithStar).toContain('.');
          expect(resultsWithStar).toContain('./file1.txt');
@@ -329,4 +349,35 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
         expect(results).not.toContain('./node_modules/some_package');
    });
 
-}); // End describe block
+    describe('Default Excludes (.gradle)', () => {
+        it('should exclude .gradle by default (relative output)', () => {
+            const results = runTraverse([], testDir);
+            expect(results.stdoutLines).not.toContain('./.gradle');
+            expect(results.stdoutLines).not.toContain('./.gradle/caches');
+            expect(results.stdoutLines).not.toContain('./.gradle/wrapper/gradle-wrapper.jar');
+        });
+
+        it('should include .gradle if explicitly included via --name (and default exclude is bypassed)', () => {
+            const results = runTraverse(['--name', '.gradle', '--name', '.gradle/**'], testDir);
+            const expectedRelative = [
+                './.gradle',
+                './.gradle/caches',
+                './.gradle/wrapper',
+                './.gradle/wrapper/gradle-wrapper.jar',
+            ].sort();
+            const receivedNormalized = normalizeAndSort(results.stdoutLines);
+            expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
+            expect(receivedNormalized).toContain('./.gradle/wrapper/gradle-wrapper.jar');
+            expect(receivedNormalized.length).toBe(expectedRelative.length);
+        });
+
+        it('should include file inside .gradle if explicitly included via --name (pruning bypassed)', () => {
+            const results = runTraverse(['--name', '.gradle/wrapper/gradle-wrapper.jar'], testDir);
+            const expectedRelative = [
+                './.gradle/wrapper/gradle-wrapper.jar',
+            ].sort();
+             const receivedNormalized = normalizeAndSort(results.stdoutLines);
+             expect(receivedNormalized).toEqual(expectedRelative);
+        });
+    });
+});

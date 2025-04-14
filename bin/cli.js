@@ -131,7 +131,7 @@ class PhindApp {
             // MAX_SAFE_INTEGER is handled by yargs coerce now
             const maxDepth = argv.maxdepth;
             // Define defaults consistently here for the traverser's override logic
-            const defaultExcludesForOverrideLogic = ['node_modules', '.git'];
+            const defaultExcludesForOverrideLogic = ['node_modules', '.git', '.gradle'];
             const traverseOptions = {
                 // Get the combined list of excludes from config
                 excludePatterns: this.config.getEffectiveExcludePatterns(),

@@ -16,7 +16,7 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
 
     it('should find only files when matchType="f" (absolute)', async () => {
         // Use absolute helper
-        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { matchType: 'f', excludePatterns: ['node_modules', '.git'] });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { matchType: 'f', excludePatterns: ['node_modules', '.git', '.gradle'] });
         expect(results).toContain(path.join(testDir, 'file1.txt'));
         expect(results).toContain(path.join(testDir, '.hiddenfile'));
         expect(results).toContain(path.join(testDir, 'dir1', 'file3.txt'));
@@ -28,7 +28,7 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
 
     it('should find only files when matchType="f" (relative)', async () => {
         // Use new default (relative) helper
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { matchType: 'f', excludePatterns: ['node_modules', '.git'] });
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { matchType: 'f', excludePatterns: ['node_modules', '.git', '.gradle'] });
         // Prepend ./ to relative paths
         expect(results).toContain('./file1.txt');
         expect(results).toContain('./.hiddenfile');
@@ -41,7 +41,7 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
 
     it('should find only directories when matchType="d" (absolute)', async () => {
         // Use absolute helper
-        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { matchType: 'd', excludePatterns: ['node_modules', '.git'] });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { matchType: 'd', excludePatterns: ['node_modules', '.git', '.gradle'] });
         expect(results).toContain(path.join(testDir, 'dir1'));
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1'));
         expect(results).toContain(path.join(testDir, 'emptyDir'));
@@ -54,7 +54,7 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
 
     it('should find only directories when matchType="d" (relative)', async () => {
         // Use new default (relative) helper
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { matchType: 'd', excludePatterns: ['node_modules', '.git'] });
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { matchType: 'd', excludePatterns: ['node_modules', '.git', '.gradle'] });
         expect(results).toContain('.'); // Base path is a directory
         // Prepend ./ to relative paths
         expect(results).toContain('./dir1');
@@ -69,7 +69,7 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
 
     it('should find both files and directories when matchType=null (absolute)', async () => {
         // Use absolute helper
-        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { excludePatterns: ['node_modules', '.git'] });
+        const results = await runTraverseAbsolute(testDir, spies.consoleLogSpy, { excludePatterns: ['node_modules', '.git', '.gradle'] });
         expect(results).toContain(path.join(testDir, 'file1.txt'));
         expect(results).toContain(path.join(testDir, '.hiddenfile'));
         expect(results).toContain(path.join(testDir, 'dir1', 'file3.txt'));
@@ -82,7 +82,7 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
 
     it('should find both files and directories when matchType=null (relative)', async () => {
         // Use new default (relative) helper
-        const results = await runTraverse(testDir, spies.consoleLogSpy, { excludePatterns: ['node_modules', '.git'] });
+        const results = await runTraverse(testDir, spies.consoleLogSpy, { excludePatterns: ['node_modules', '.git', '.gradle'] });
         expect(results).toContain('.'); // Base path
         // Prepend ./ to relative paths
         expect(results).toContain('./file1.txt');
@@ -124,3 +124,4 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
         expect(results).not.toContain('.');
     });
 });
+```

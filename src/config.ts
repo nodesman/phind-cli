@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import os from 'os';
 
 export class PhindConfig {
-    private readonly hardcodedDefaultExcludes: string[] = ['node_modules', '.git'];
+    private readonly hardcodedDefaultExcludes: string[] = ['node_modules', '.git', '.gradle'];
     private globalIgnorePatterns: string[] = [];
     private globalIgnorePath: string = '';
     private cliExcludePatterns: string[] = [];

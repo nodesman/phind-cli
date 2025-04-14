@@ -44,6 +44,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             path.join(testDir, 'file1.txt'),
             path.join(testDir, 'file2.log'),
             // path.join(testDir, 'node_modules'), // Excluded by default
+            // path.join(testDir, '.gradle'), // Excluded by default
             path.join(testDir, 'unreadable_dir'),
             testDir
         ].sort();
@@ -67,6 +68,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             './file1.txt',
             './file2.log',
             // './node_modules', // Excluded by default
+            // './.gradle', // Excluded by default
             './unreadable_dir',
         ].sort();
         const results = await runTraverse(testDir, spies.consoleLogSpy, { maxDepth: 1 }); // Use default relative helper
@@ -95,6 +97,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             path.join(testDir, 'file1.txt'),
             path.join(testDir, 'file2.log'),
             // path.join(testDir, 'node_modules'), // Excluded by default
+            // path.join(testDir, '.gradle'), // Excluded by default
             // path.join(testDir, 'node_modules', 'some_package'), // Excluded by default
             // path.join(testDir, 'node_modules', 'some_package', 'index.js'), // Excluded by default
             path.join(testDir, 'unreadable_dir'),
@@ -133,6 +136,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
             './file1.txt',
             './file2.log',
             // './node_modules', // Excluded by default
+            // './.gradle', // Excluded by default
             // './node_modules/some_package', // Excluded by default
             // './node_modules/some_package/index.js', // Excluded by default
             './unreadable_dir',
@@ -150,7 +154,7 @@ describe('DirectoryTraverser - Depth Limiting (--maxdepth)', () => {
         // Check a deep file exists, confirming recursion went deep
         expect(results).toContain(path.join(testDir, 'dir1', 'subDir1', 'file4.js'));
         // Adjust count based on final structure (testStructure) and default excludes
-        const totalExpectedCount = 23; // Manually count items in testStructure excluding node_modules/* and .git/* contents
+        const totalExpectedCount = 23; // Manually count items in testStructure excluding node_modules/*, .git/* and .gradle contents
         expect(results.length).toBe(totalExpectedCount);
     });
 

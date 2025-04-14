@@ -10,7 +10,7 @@ const promises_1 = __importDefault(require("fs/promises"));
 const os_1 = __importDefault(require("os"));
 class PhindConfig {
     constructor() {
-        this.hardcodedDefaultExcludes = ['node_modules', '.git'];
+        this.hardcodedDefaultExcludes = ['node_modules', '.git', '.gradle'];
         this.globalIgnorePatterns = [];
         this.globalIgnorePath = '';
         this.cliExcludePatterns = [];

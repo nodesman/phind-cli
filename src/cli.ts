@@ -135,7 +135,7 @@ class PhindApp {
             const maxDepth = argv.maxdepth as number;
 
             // Define defaults consistently here for the traverser's override logic
-            const defaultExcludesForOverrideLogic = ['node_modules', '.git'];
+            const defaultExcludesForOverrideLogic = ['node_modules', '.git', '.gradle'];
 
             const traverseOptions: TraverseOptions = {
                 // Get the combined list of excludes from config

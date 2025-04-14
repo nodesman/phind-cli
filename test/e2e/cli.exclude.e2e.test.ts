@@ -30,6 +30,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
         },
         'excluded.tmp': 'temp file',
         'empty': null,
+        '.gradle': { 'caches': {}, 'wrapper': { 'gradle-wrapper.jar': '' } }
     };
 
     beforeEach(async () => {
@@ -72,6 +73,13 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             expect(result.stdoutLines).not.toContain('./.git/HEAD');
         });
 
+        it('should exclude .gradle by default (relative output)', () => {
+            const result = runCli([], testDir);
+            expect(result.stdoutLines).not.toContain('./.gradle');
+            expect(result.stdoutLines).not.toContain('./.gradle/caches');
+            expect(result.stdoutLines).not.toContain('./.gradle/wrapper/gradle-wrapper.jar');
+        });
+
         it('should include node_modules if explicitly included via --name (and default exclude is bypassed by specific include)', () => {
             // --relative is default, but explicitly stating it doesn't hurt
             const result = runCli(['--name', 'node_modules/**', '--relative'], testDir);
@@ -102,12 +110,36 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
              expect(receivedNormalized).not.toContain('./.git');
              expect(receivedNormalized.length).toBe(expectedRelative.length);
         });
+
+        it('should include .gradle if explicitly included via --name (and default exclude is bypassed by specific include)', () => {
+            const result = runCli(['--name', '.gradle', '--name', '.gradle/**'], testDir);
+            const expectedRelative = [
+                './.gradle',
+                './.gradle/caches',
+                './.gradle/wrapper',
+                './.gradle/wrapper/gradle-wrapper.jar',
+            ].sort();
+            const receivedNormalized = normalizeAndSort(result.stdoutLines);
+            expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
+            // Add specific checks if needed
+            expect(receivedNormalized).toContain('./.gradle/wrapper/gradle-wrapper.jar');
+            expect(receivedNormalized.length).toBe(expectedRelative.length);
+        });
+
+        it('should include file inside .gradle if explicitly included via --name (pruning bypassed)', () => {
+            const result = runCli(['--name', '.gradle/wrapper/gradle-wrapper.jar'], testDir);
+            const expectedRelative = [
+                './.gradle/wrapper/gradle-wrapper.jar',
+            ].sort();
+             const receivedNormalized = normalizeAndSort(result.stdoutLines);
+             expect(receivedNormalized).toEqual(expectedRelative);
+        });
     });
 
     describe('Exclude Patterns (--exclude, -e)', () => {
         it('should exclude files matching a single --exclude pattern (relative)', () => {
             // Relative is default
-            const result = runCli(['--exclude', '*.txt'], testDir);
+            const result = runCli(['--exclude', Lock/**/*.lock'], testDir);
             expect(result.stdoutLines).not.toContain('./doc.txt');
             expect(result.stdoutLines).toContain('./script.js'); // Ensure other files present
         });
@@ -200,6 +232,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             // Default excludes still apply
             expect(result.stdoutLines).not.toContain('./node_modules');
             expect(result.stdoutLines).not.toContain('./.git');
+            expect(result.stdoutLines).not.toContain('./.gradle');
 
             // Other files should be present
             expect(result.stdoutLines).toContain('./doc.txt'); // Sanity check
@@ -224,6 +257,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             // Default excludes still apply
             expect(result.stdoutLines).not.toContain('./node_modules');
             expect(result.stdoutLines).not.toContain('./.git');
+            expect(result.stdoutLines).not.toContain('./.gradle');
 
             // Other files should be present
             expect(result.stdoutLines).toContain('./doc.txt');
@@ -244,6 +278,7 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             expect(result.stdoutLines).not.toContain('./build/output.log'); // Global exclude
             expect(result.stdoutLines).not.toContain('./node_modules');     // Default exclude
             expect(result.stdoutLines).not.toContain('./.git');             // Default exclude
+            expect(result.stdoutLines).not.toContain('./.gradle');          // Default exclude
 
             // Check remaining files
             expect(result.stdoutLines).toContain('./doc.txt');
@@ -270,6 +305,40 @@ describe('CLI E2E - Excludes (Default, CLI, Global)', () => {
             // Check that default excludes ARE still applied
             expect(result.stdoutLines).not.toContain('./node_modules');
             expect(result.stdoutLines).not.toContain('./.git');
+            expect(result.stdoutLines).not.toContain('./.gradle');
+        });
+    });
+
+    describe('Default Excludes (.gradle)', () => {
+        it('should exclude .gradle by default (relative output)', () => {
+            const result = runCli([], testDir);
+            expect(result.stdoutLines).not.toContain('./.gradle');
+            expect(result.stdoutLines).not.toContain('./.gradle/caches');
+            expect(result.stdoutLines).not.toContain('./.gradle/wrapper/gradle-wrapper.jar');
+        });
+
+        it('should include .gradle if explicitly included via --name (and default exclude is bypassed)', () => {
+            const result = runCli(['--name', '.gradle', '--name', '.gradle/**'], testDir);
+            const expectedRelative = [
+                './.gradle',
+                './.gradle/caches',
+                './.gradle/wrapper',
+                './.gradle/wrapper/gradle-wrapper.jar',
+            ].sort();
+            const receivedNormalized = normalizeAndSort(result.stdoutLines);
+            expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
+            // Add specific checks if needed
+            expect(receivedNormalized).toContain('./.gradle/wrapper/gradle-wrapper.jar');
+            expect(receivedNormalized.length).toBe(expectedRelative.length);
+        });
+
+        it('should include file inside .gradle if explicitly included via --name (pruning bypassed)', () => {
+            const result = runCli(['--name', '.gradle/wrapper/gradle-wrapper.jar'], testDir);
+            const expectedRelative = [
+                './.gradle/wrapper/gradle-wrapper.jar',
+            ].sort();
+             const receivedNormalized = normalizeAndSort(result.stdoutLines);
+             expect(receivedNormalized).toEqual(expectedRelative);
         });
     });
 });

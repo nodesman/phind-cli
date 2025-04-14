@@ -33,6 +33,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
         const expected = [
             '.',
             // './.git', // Excluded by default via helper
+            // './.gradle', // Excluded by default via helper
             './.hiddenDir',
             './dir with spaces',
             './dir1',
@@ -50,6 +51,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
        const expected = [
             '.', // Start dir
             // './.git', // Excluded by default via helper
+            // './.gradle', // Excluded by default via helper
             './.hiddenDir',
             './.hiddenfile',
             './ Capitals.TXT',
@@ -152,6 +154,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
             '.',
             './ Capitals.TXT', // Not excluded
             // './.git', // Excluded by default via helper
+            // './.gradle', // Excluded by default via helper
             './.hiddenDir',
             './.hiddenfile',
             './dir with spaces',
@@ -180,6 +183,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
        const expected = [
             '.', // Starting dir
             // './.git', // Excluded by default via helper
+            // './.gradle', // Excluded by default via helper
             './.hiddenDir',
             './.hiddenDir/insideHidden.txt', // Content of non-pruned dir
             './.hiddenfile',
@@ -208,6 +212,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
         const expected = [
            '.',
            // './.git', // Excluded by default via helper
+           // './.gradle', // Excluded by default via helper
            './.hiddenDir',
            './.hiddenDir/insideHidden.txt', // Content of non-pruned dir
            './.hiddenfile',
@@ -233,7 +238,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
          // MaxDepth 2 includes depth 0, 1, 2
          // matchType 'f' means only files
          // excludePatterns 'dir2' prunes dir2
-         // Default excludes (.git, node_modules) applied by helper
+         // Default excludes (.git, node_modules) are applied by helper
          const expected = [
             // Depth 1 files:
             './.hiddenfile',
@@ -268,6 +273,7 @@ describe('DirectoryTraverser - Option Combinations', () => {
          const expected = [
             '.',
             // './.git', // Excluded by default helper
+            // './.gradle', // Excluded by default helper
             // './.hiddenDir', // Excluded by **/.*
             './dir with spaces',
             './dir1',
