@@ -364,10 +364,12 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
                 includePatterns: ['.gradle', '.gradle/**'] // Pass include patterns in options
             });
             const expectedRelative = [
-                './.gradle',
-                './.gradle/caches',
-                './.gradle/wrapper',
-                './.gradle/wrapper/gradle-wrapper.jar',
+                './.gradle', // Matches .gradle
+                './.gradle/caches', // Matches .gradle/**
+                './.gradle/caches/modules-2', // Matches .gradle/**
+                './.gradle/caches/modules-2/files-2.1', // Matches .gradle/**
+                './.gradle/wrapper', // Matches .gradle/**
+                './.gradle/wrapper/gradle-wrapper.jar', // Matches .gradle/**
             ].sort();
             // Directly compare the awaited results (already sorted by the helper)
             expect(results).toEqual(expect.arrayContaining(expectedRelative));
