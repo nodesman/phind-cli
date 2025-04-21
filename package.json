@@ -1,6 +1,6 @@
 {
   "name": "phind-cli",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "A modern, intuitive, cross-platform command-line tool for finding files and directories recursively, designed with developers in mind.",
   "bin": {
     "phind": "bin/cli.js"
