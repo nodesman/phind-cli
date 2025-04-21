@@ -350,34 +350,41 @@ describe('DirectoryTraverser - Exclude Patterns (--exclude)', () => {
    });
 
     describe('Default Excludes (.gradle)', () => {
-        it('should exclude .gradle by default (relative output)', () => {
-            const results = runTraverse([], testDir);
-            expect(results.stdoutLines).not.toContain('./.gradle');
-            expect(results.stdoutLines).not.toContain('./.gradle/caches');
-            expect(results.stdoutLines).not.toContain('./.gradle/wrapper/gradle-wrapper.jar');
+        it('should exclude .gradle by default (relative output)', async () => {
+            // Correctly call runTraverse and await the result
+            const results = await runTraverse(testDir, spies.consoleLogSpy); // Pass spy
+            expect(results).not.toContain('./.gradle');
+            expect(results).not.toContain('./.gradle/caches');
+            expect(results).not.toContain('./.gradle/wrapper/gradle-wrapper.jar');
         });
 
-        it('should include .gradle if explicitly included via --name (and default exclude is bypassed)', () => {
-            const results = runTraverse(['--name', '.gradle', '--name', '.gradle/**'], testDir);
+        it('should include .gradle if explicitly included via --name (and default exclude is bypassed)', async () => {
+             // Correctly call runTraverse, pass options, and await the result
+             const results = await runTraverse(testDir, spies.consoleLogSpy, {
+                includePatterns: ['.gradle', '.gradle/**'] // Pass include patterns in options
+            });
             const expectedRelative = [
                 './.gradle',
                 './.gradle/caches',
                 './.gradle/wrapper',
                 './.gradle/wrapper/gradle-wrapper.jar',
             ].sort();
-            const receivedNormalized = normalizeAndSort(results.stdoutLines);
-            expect(receivedNormalized).toEqual(expect.arrayContaining(expectedRelative));
-            expect(receivedNormalized).toContain('./.gradle/wrapper/gradle-wrapper.jar');
-            expect(receivedNormalized.length).toBe(expectedRelative.length);
+            // Directly compare the awaited results (already sorted by the helper)
+            expect(results).toEqual(expect.arrayContaining(expectedRelative));
+            expect(results).toContain('./.gradle/wrapper/gradle-wrapper.jar');
+            expect(results.length).toBe(expectedRelative.length);
         });
 
-        it('should include file inside .gradle if explicitly included via --name (pruning bypassed)', () => {
-            const results = runTraverse(['--name', '.gradle/wrapper/gradle-wrapper.jar'], testDir);
+        it('should include file inside .gradle if explicitly included via --name (pruning bypassed)', async () => {
+            // Correctly call runTraverse, pass options, and await the result
+            const results = await runTraverse(testDir, spies.consoleLogSpy, {
+                includePatterns: ['.gradle/wrapper/gradle-wrapper.jar'] // Pass include pattern in options
+            });
             const expectedRelative = [
                 './.gradle/wrapper/gradle-wrapper.jar',
             ].sort();
-             const receivedNormalized = normalizeAndSort(results.stdoutLines);
-             expect(receivedNormalized).toEqual(expectedRelative);
+             // Directly compare the awaited results (already sorted by the helper)
+             expect(results).toEqual(expectedRelative);
         });
     });
 });
