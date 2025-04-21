@@ -2,3 +2,6 @@ node_modules
 .kaichats
 *.map
 coverage
+.idea
+# Kai specific logs (auto-added by GitService)
+.kai/logs/

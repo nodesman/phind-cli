@@ -1,6 +1,6 @@
 # phind-cli
 
-**`phind` (PHilosophical find): A modern, intuitive, cross-platform command-line tool for finding files and directories recursively, designed with developers in mind.**
+**`phind`: A modern, intuitive, cross-platform command-line tool for finding files and directories recursively, designed with developers in mind.**
 
 ---
 
@@ -8,7 +8,7 @@
 
 ---
 
-## The Problem: Why Another `find` Tool?
+## Why Another `find` Tool?
 
 The standard `find` command, while powerful, presents several challenges, especially for developers working across different environments:
 
