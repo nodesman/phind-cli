@@ -37,11 +37,14 @@
     "cross-platform",
     "utility",
     "typescript",
-    "find-files"
+    "find-files",
+    "ai",
+    "gemini"
   ],
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",
   "dependencies": {
+    "@google/generative-ai": "^0.16.0",
     "micromatch": "^4.0.5",
     "yargs": "^17.7.2"
   },

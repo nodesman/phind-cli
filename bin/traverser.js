@@ -9,7 +9,10 @@ const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const micromatch_1 = __importDefault(require("micromatch"));
 class DirectoryTraverser {
+    // --- END: Add collected results array ---
     constructor(options, basePath) {
+        // --- START: Add collected results array ---
+        this.collectedResults = [];
         this.options = options;
         this.basePath = path_1.default.resolve(basePath);
         this.baseMicromatchOptions = {
@@ -18,6 +21,9 @@ class DirectoryTraverser {
         };
         // Pre-calculate include patterns that are not the default '*' for override logic
         this.nonDefaultIncludePatterns = options.includePatterns.filter(p => p !== '*');
+        // --- START: Initialize OutputMode ---
+        this.outputMode = options.outputMode ?? 'print'; // Default to print
+        // --- END: Initialize OutputMode ---
     }
     /**
      * Checks if an item matches any pattern in a list.
@@ -261,6 +267,17 @@ class DirectoryTraverser {
             return true;
         }
     } // End shouldPrintItem
+    // --- START: Modify handleResult ---
+    /** Handles printing or collecting a found item. */
+    handleResult(displayPath) {
+        if (this.outputMode === 'collect') {
+            this.collectedResults.push(displayPath);
+        }
+        else {
+            console.log(displayPath); // Default behavior
+        }
+    }
+    // --- END: Modify handleResult ---
     /** Main traversal method */
     async traverse(startPath, currentDepth = 0) {
         const resolvedStartPath = path_1.default.resolve(startPath);
@@ -275,11 +292,10 @@ class DirectoryTraverser {
                 isStartDir = isDirectory;
                 const dirName = path_1.default.basename(resolvedStartPath);
                 const relativePathForStart = this.calculateRelativePath(resolvedStartPath);
-                // Use resolvedStartPath for absolute, relativePathForStart for relative display
                 const displayPath = this.options.relativePaths ? relativePathForStart : resolvedStartPath;
-                // --- Rely on shouldPrintItem to handle the '.' case ---
                 if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
-                    console.log(displayPath);
+                    // --- Use handleResult ---
+                    this.handleResult(displayPath);
                 }
                 if (isDirectory) {
                     canReadEntries = true;
@@ -334,7 +350,8 @@ class DirectoryTraverser {
             // --- Print Check ---
             // Rely on shouldPrintItem to handle the '.' case correctly now
             if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
-                console.log(displayPath);
+                // --- Use handleResult ---
+                this.handleResult(displayPath);
             }
             // --- Recurse ---
             if (isDirectory) {
@@ -343,6 +360,15 @@ class DirectoryTraverser {
             }
         }
     } // End traverse
+    // --- START: Add getCollectedResults method ---
+    /** Returns the collected results if outputMode was 'collect'. */
+    getCollectedResults() {
+        if (this.outputMode !== 'collect') {
+            console.warn("Attempted to get collected results when outputMode was not 'collect'.");
+            return [];
+        }
+        return this.collectedResults;
+    }
 } // End class
 exports.DirectoryTraverser = DirectoryTraverser;
 //# sourceMappingURL=traverser.js.map

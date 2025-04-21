@@ -4,7 +4,10 @@ import path from 'path';
 import micromatch from 'micromatch';
 import type { Dirent } from 'fs';
 
-// Options interface remains the same
+// --- START: Add OutputMode ---
+type OutputMode = 'print' | 'collect';
+// --- END: Add OutputMode ---
+
 export interface TraverseOptions {
     excludePatterns: string[]; // Combined effective list from config
     includePatterns: string[];
@@ -13,6 +16,9 @@ export interface TraverseOptions {
     ignoreCase: boolean;
     relativePaths: boolean;
     defaultExcludes: string[]; // The hardcoded defaults for override logic
+    // --- START: Add OutputMode ---
+    outputMode?: OutputMode; // Make optional, default to 'print'
+    // --- END: Add OutputMode ---
 }
 
 interface InternalMicromatchOptions {
@@ -25,6 +31,10 @@ export class DirectoryTraverser {
     private readonly basePath: string;
     private readonly baseMicromatchOptions: InternalMicromatchOptions;
     private readonly nonDefaultIncludePatterns: string[]; // Include patterns other than '*'
+    // --- START: Add collected results array ---
+    private collectedResults: string[] = [];
+    private readonly outputMode: OutputMode;
+    // --- END: Add collected results array ---
 
     constructor(options: TraverseOptions, basePath: string) {
         this.options = options;
@@ -35,6 +45,9 @@ export class DirectoryTraverser {
         };
         // Pre-calculate include patterns that are not the default '*' for override logic
         this.nonDefaultIncludePatterns = options.includePatterns.filter(p => p !== '*');
+        // --- START: Initialize OutputMode ---
+        this.outputMode = options.outputMode ?? 'print'; // Default to print
+        // --- END: Initialize OutputMode ---
     }
 
     /**
@@ -326,9 +339,19 @@ export class DirectoryTraverser {
         }
     } // End shouldPrintItem
 
+    // --- START: Modify handleResult ---
+    /** Handles printing or collecting a found item. */
+    private handleResult(displayPath: string): void {
+        if (this.outputMode === 'collect') {
+            this.collectedResults.push(displayPath);
+        } else {
+            console.log(displayPath); // Default behavior
+        }
+    }
+    // --- END: Modify handleResult ---
 
     /** Main traversal method */
-    public async traverse(startPath: string, currentDepth: number = 0): Promise<void> {
+    public async traverse(startPath: string, currentDepth: number = 0): Promise<void> { // Keep void return for initial call
         const resolvedStartPath = path.resolve(startPath);
 
         let canReadEntries = false;
@@ -343,12 +366,11 @@ export class DirectoryTraverser {
 
                 const dirName = path.basename(resolvedStartPath);
                 const relativePathForStart = this.calculateRelativePath(resolvedStartPath);
-                // Use resolvedStartPath for absolute, relativePathForStart for relative display
                 const displayPath = this.options.relativePaths ? relativePathForStart : resolvedStartPath;
 
-                // --- Rely on shouldPrintItem to handle the '.' case ---
                 if (this.shouldPrintItem(dirName, resolvedStartPath, relativePathForStart, isDirectory, isFile)) {
-                     console.log(displayPath);
+                    // --- Use handleResult ---
+                    this.handleResult(displayPath);
                 }
 
                 if (isDirectory) {
@@ -406,7 +428,8 @@ export class DirectoryTraverser {
              // --- Print Check ---
              // Rely on shouldPrintItem to handle the '.' case correctly now
              if (this.shouldPrintItem(entryName, entryFullPath, entryRelativePath, isDirectory, isFile)) {
-                 console.log(displayPath);
+                 // --- Use handleResult ---
+                 this.handleResult(displayPath);
              }
 
              // --- Recurse ---
@@ -416,5 +439,16 @@ export class DirectoryTraverser {
              }
         }
     } // End traverse
+
+    // --- START: Add getCollectedResults method ---
+    /** Returns the collected results if outputMode was 'collect'. */
+    public getCollectedResults(): string[] {
+        if (this.outputMode !== 'collect') {
+            console.warn("Attempted to get collected results when outputMode was not 'collect'.");
+            return [];
+        }
+        return this.collectedResults;
+    }
+    // --- END: Add getCollectedResults method ---
 
 } // End class
