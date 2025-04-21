@@ -244,7 +244,7 @@ describe('PhindConfig', () => {
     });
 
     describe('getEffectiveExcludePatterns', () => {
-        const defaultExcludes = ['node_modules', '.git'];
+        const defaultExcludes = ['node_modules', '.git', '.gradle']; // <-- ADD .gradle
 
         it('should return only defaults if no global and no CLI ignores', () => {
             const config = new PhindConfig();
@@ -260,7 +260,7 @@ describe('PhindConfig', () => {
             await config.loadGlobalIgnores(); // Loads and invalidates cache
             // No setCliExcludes called
             const expected = [...defaultExcludes, '*.tmp', 'dist/'];
-            expect(config.getEffectiveExcludePatterns()).toEqual(expected);
+            expect(config.getEffectiveExcludePatterns()).toEqual([...new Set(expected)]); // <-- Use Set to match implementation
             expect((config as any).combinedExcludePatterns).toEqual(expected); // Cache check
         });
 
@@ -269,7 +269,7 @@ describe('PhindConfig', () => {
             // No loadGlobalIgnores called
             config.setCliExcludes(['build/', '*.o']); // Invalidates cache
             const expected = [...defaultExcludes, 'build/', '*.o'];
-            expect(config.getEffectiveExcludePatterns()).toEqual(expected);
+            expect(config.getEffectiveExcludePatterns()).toEqual([...new Set(expected)]); // <-- Use Set to match implementation
             expect((config as any).combinedExcludePatterns).toEqual(expected); // Cache check
         });
 
@@ -279,7 +279,7 @@ describe('PhindConfig', () => {
             await config.loadGlobalIgnores(); // Loads and invalidates cache
             config.setCliExcludes(['build/', '*.o']); // Invalidates cache again
             const expected = [...defaultExcludes, '*.tmp', 'dist/', 'build/', '*.o'];
-            expect(config.getEffectiveExcludePatterns()).toEqual(expected);
+            expect(config.getEffectiveExcludePatterns()).toEqual([...new Set(expected)]); // <-- Use Set to match implementation
             expect((config as any).combinedExcludePatterns).toEqual(expected); // Cache check
         });
 
@@ -302,14 +302,14 @@ describe('PhindConfig', () => {
              await config.loadGlobalIgnores();
 
              const result1 = config.getEffectiveExcludePatterns(); // Defaults + global
-             expect(result1).toEqual([...defaultExcludes, '*.tmp']);
+             expect(result1).toEqual([...new Set([...defaultExcludes, '*.tmp'])]); // <-- Use Set
              expect((config as any).combinedExcludePatterns).toBe(result1); // Cache check
 
              config.setCliExcludes(['cli_new']); // Invalidate cache
              expect((config as any).combinedExcludePatterns).toBeNull(); // Verify cache invalidated
 
              const result2 = config.getEffectiveExcludePatterns(); // Recalculate
-             expect(result2).toEqual([...defaultExcludes, '*.tmp', 'cli_new']);
+             expect(result2).toEqual([...new Set([...defaultExcludes, '*.tmp', 'cli_new'])]); // <-- Use Set
              expect(result1).not.toBe(result2); // Should be a new array instance
              expect((config as any).combinedExcludePatterns).toBe(result2); // Cache check
         });
@@ -320,7 +320,7 @@ describe('PhindConfig', () => {
              await config.loadGlobalIgnores(); // Load 1
 
              const result1 = config.getEffectiveExcludePatterns(); // Defaults + global 1
-             expect(result1).toEqual([...defaultExcludes, '*.tmp']);
+             expect(result1).toEqual([...new Set([...defaultExcludes, '*.tmp'])]); // <-- Use Set
              expect((config as any).combinedExcludePatterns).toBe(result1); // Cache check
 
              mockedFs.readFile.mockResolvedValueOnce('*.log\ncache/');
@@ -328,7 +328,7 @@ describe('PhindConfig', () => {
              expect((config as any).combinedExcludePatterns).toBeNull(); // Verify cache invalidated
 
              const result2 = config.getEffectiveExcludePatterns(); // Recalculate
-             expect(result2).toEqual([...defaultExcludes, '*.log', 'cache/']);
+             expect(result2).toEqual([...new Set([...defaultExcludes, '*.log', 'cache/'])]); // <-- Use Set
              expect(result1).not.toBe(result2); // Should be a new array instance
              expect((config as any).combinedExcludePatterns).toBe(result2); // Cache check
          });
@@ -340,27 +340,22 @@ describe('PhindConfig', () => {
              await config.loadGlobalIgnores();
              config.setCliExcludes(['*.log', '.git']); // cli has duplicate
 
-             // Current implementation *doesn't* deduplicate, which might be okay
-             // If deduplication is added, this test should change.
+             // Implementation now deduplicates using Set
              const expected = [
-                 'node_modules', '.git', // defaults
-                 'node_modules', 'cache/', // global
-                 '*.log', '.git' // cli
+                 'node_modules', '.git', '.gradle', // defaults
+                 'cache/', // global (node_modules duplicate removed)
+                 '*.log' // cli (.git duplicate removed)
                 ];
              const actual = config.getEffectiveExcludePatterns();
-             expect(actual).toEqual(expected);
-
-             // If deduplication were desired (uncomment the Set line in config.ts):
-             // const expectedDeduped = ['node_modules', '.git', 'cache/', '*.log'];
-             // expect(actual).toEqual(expect.arrayContaining(expectedDeduped));
-             // expect(actual.length).toEqual(expectedDeduped.length);
+             expect(actual).toEqual(expect.arrayContaining(expected)); // Use arrayContaining due to Set order unpredictability
+             expect(actual.length).toBe(expected.length);
          });
     });
 
     describe('getDefaultExcludesDescription', () => {
         it('should return the correct description string', () => {
             const config = new PhindConfig();
-            expect(config.getDefaultExcludesDescription()).toBe('"node_modules", ".git"');
+            expect(config.getDefaultExcludesDescription()).toBe('"node_modules", ".git", ".gradle"'); // <-- ADD .gradle
         });
 
         it('should return empty string if hardcoded defaults were empty (hypothetical)', () => {

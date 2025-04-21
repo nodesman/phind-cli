@@ -124,4 +124,3 @@ describe('DirectoryTraverser - Type Filtering (--type)', () => {
         expect(results).not.toContain('.');
     });
 });
-```
