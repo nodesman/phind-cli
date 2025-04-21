@@ -5,3 +5,4 @@ coverage
 .idea
 # Kai specific logs (auto-added by GitService)
 .kai/logs/
+bin/

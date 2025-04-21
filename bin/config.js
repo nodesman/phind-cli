@@ -42,8 +42,26 @@ class PhindConfig {
     getGlobalIgnorePath() {
         return this.globalIgnorePath;
     }
+    // --- START: ADDED GETTERS ---
+    getHardcodedDefaultExcludes() {
+        // Return a copy to prevent external modification of the internal array
+        return [...this.hardcodedDefaultExcludes];
+    }
+    getLoadedGlobalIgnorePatterns() {
+        // Return a copy to prevent external modification of the internal array
+        // Ensure loadGlobalIgnores has been called before accessing this meaningfully
+        return [...this.globalIgnorePatterns];
+    }
+    // --- END: ADDED GETTERS ---
     async loadGlobalIgnores(forceReload = false) {
-        if (!forceReload && this.globalIgnorePatterns.length > 0) {
+        // --- Added check: If forcing reload, always clear current patterns ---
+        if (forceReload) {
+            this.globalIgnorePatterns = []; // Clear before attempting reload
+            this.combinedExcludePatterns = null; // Ensure cache is invalidated
+        }
+        // --- End added check ---
+        else if (this.globalIgnorePatterns.length > 0) {
+            // If not forcing reload and patterns already exist, return
             return;
         }
         try {
@@ -55,14 +73,14 @@ class PhindConfig {
         }
         catch (err) {
             if (err.code === 'ENOENT') {
-                this.globalIgnorePatterns = [];
+                this.globalIgnorePatterns = []; // Explicitly set to empty on not found
             }
             else {
                 console.warn(`Warning: Could not read global ignore file at ${this.globalIgnorePath}: ${err.message}`);
-                this.globalIgnorePatterns = [];
+                this.globalIgnorePatterns = []; // Explicitly set to empty on error
             }
         }
-        this.combinedExcludePatterns = null; // Invalidate cache
+        this.combinedExcludePatterns = null; // Invalidate cache after any read attempt (success or failure)
     }
     setCliExcludes(cliExcludes) {
         this.cliExcludePatterns = cliExcludes;
@@ -71,12 +89,12 @@ class PhindConfig {
     getEffectiveExcludePatterns() {
         if (this.combinedExcludePatterns === null) {
             this.combinedExcludePatterns = [
-                ...this.hardcodedDefaultExcludes,
-                ...this.globalIgnorePatterns,
-                ...this.cliExcludePatterns,
+                ...this.hardcodedDefaultExcludes, // Use private directly here is fine
+                ...this.globalIgnorePatterns, // Use private directly here is fine
+                ...this.cliExcludePatterns, // Use private directly here is fine
             ];
-            // Optional: Deduplicate if necessary
-            // this.combinedExcludePatterns = [...new Set(this.combinedExcludePatterns)];
+            // Deduplicate using Set for cleaner results
+            this.combinedExcludePatterns = [...new Set(this.combinedExcludePatterns)];
         }
         return this.combinedExcludePatterns;
     }

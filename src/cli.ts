@@ -138,12 +138,16 @@ class PhindApp {
                 // We always collect relative paths for consistency in the AI prompt.
 
                 if (!argv.skipGlobalIgnore) {
+                    // Ensure global ignores are loaded *before* accessing them
                     await this.config.loadGlobalIgnores();
                 }
+
                 // Use only hardcoded and global excludes for AI file collection
                 const aiExcludePatterns = [
-                    ...this.config.hardcodedDefaultExcludes,
-                    ...(argv.skipGlobalIgnore ? [] : this.config.globalIgnorePatterns)
+                    // --- FIX: Use getter ---
+                    ...this.config.getHardcodedDefaultExcludes(),
+                    // --- FIX: Use getter ---
+                    ...(argv.skipGlobalIgnore ? [] : this.config.getLoadedGlobalIgnorePatterns())
                 ];
 
                 const startArgPath = argv.path as string;
@@ -151,13 +155,14 @@ class PhindApp {
                 const basePath = startPath;
 
                 const aiTraverseOptions: TraverseOptions = {
-                    excludePatterns: [...new Set(aiExcludePatterns)], // Use combined excludes
+                    excludePatterns: [...new Set(aiExcludePatterns)], // Use combined excludes (already using Set)
                     includePatterns: ['*'], // Include everything initially
                     matchType: null, // Get all types
                     maxDepth: Number.MAX_SAFE_INTEGER, // No depth limit
                     ignoreCase: false, // Case doesn't matter for collection
                     relativePaths: true, // ALWAYS use relative paths for AI input
-                    defaultExcludes: this.config.hardcodedDefaultExcludes,
+                    // --- FIX: Use getter ---
+                    defaultExcludes: this.config.getHardcodedDefaultExcludes(),
                     outputMode: 'collect' // CRITICAL: Collect results instead of printing
                 };
 
@@ -189,22 +194,25 @@ class PhindApp {
 
             // --- Standard Mode Logic (if --ai is not used) ---
             if (!argv.skipGlobalIgnore) {
+                // Ensure global ignores are loaded before calculating effective excludes
                 await this.config.loadGlobalIgnores();
             }
+            // Set CLI excludes *after* potentially loading global ones
             this.config.setCliExcludes(argv.exclude as string[]);
 
             const startArgPath = argv.path as string;
             const startPath = await this.validateStartPath(startArgPath);
-            const basePath = startPath;
+            const basePath = startPath; // Base path for traversal is the validated start path
 
             const traverseOptions: TraverseOptions = {
-                excludePatterns: this.config.getEffectiveExcludePatterns(),
+                excludePatterns: this.config.getEffectiveExcludePatterns(), // Now gets the combined list
                 includePatterns: argv.name as string[],
                 matchType: argv.type ?? null,
                 maxDepth: argv.maxdepth as number,
                 ignoreCase: argv.ignoreCase as boolean,
                 relativePaths: argv.relative as boolean,
-                defaultExcludes: this.config.hardcodedDefaultExcludes, // Use hardcoded defaults
+                // --- FIX: Use getter ---
+                defaultExcludes: this.config.getHardcodedDefaultExcludes(), // Pass hardcoded defaults for override logic
                 outputMode: 'print' // Standard mode prints directly
             };
 

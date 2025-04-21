@@ -44,8 +44,29 @@ export class PhindConfig {
         return this.globalIgnorePath;
     }
 
+    // --- START: ADDED GETTERS ---
+    public getHardcodedDefaultExcludes(): string[] {
+        // Return a copy to prevent external modification of the internal array
+        return [...this.hardcodedDefaultExcludes];
+    }
+
+    public getLoadedGlobalIgnorePatterns(): string[] {
+        // Return a copy to prevent external modification of the internal array
+        // Ensure loadGlobalIgnores has been called before accessing this meaningfully
+        return [...this.globalIgnorePatterns];
+    }
+    // --- END: ADDED GETTERS ---
+
+
     public async loadGlobalIgnores(forceReload: boolean = false): Promise<void> {
-        if (!forceReload && this.globalIgnorePatterns.length > 0) {
+        // --- Added check: If forcing reload, always clear current patterns ---
+        if (forceReload) {
+            this.globalIgnorePatterns = []; // Clear before attempting reload
+            this.combinedExcludePatterns = null; // Ensure cache is invalidated
+        }
+        // --- End added check ---
+        else if (this.globalIgnorePatterns.length > 0) {
+            // If not forcing reload and patterns already exist, return
             return;
         }
 
@@ -57,13 +78,13 @@ export class PhindConfig {
                 .filter(line => line); // Ignore empty lines (implicitly ignores comment-only lines now)
         } catch (err: any) {
             if (err.code === 'ENOENT') {
-                this.globalIgnorePatterns = [];
+                this.globalIgnorePatterns = []; // Explicitly set to empty on not found
             } else {
                 console.warn(`Warning: Could not read global ignore file at ${this.globalIgnorePath}: ${err.message}`);
-                this.globalIgnorePatterns = [];
+                this.globalIgnorePatterns = []; // Explicitly set to empty on error
             }
         }
-        this.combinedExcludePatterns = null; // Invalidate cache
+        this.combinedExcludePatterns = null; // Invalidate cache after any read attempt (success or failure)
     }
 
     public setCliExcludes(cliExcludes: string[]): void {
@@ -74,12 +95,12 @@ export class PhindConfig {
     public getEffectiveExcludePatterns(): string[] {
         if (this.combinedExcludePatterns === null) {
              this.combinedExcludePatterns = [
-                ...this.hardcodedDefaultExcludes,
-                ...this.globalIgnorePatterns,
-                ...this.cliExcludePatterns,
+                ...this.hardcodedDefaultExcludes, // Use private directly here is fine
+                ...this.globalIgnorePatterns,     // Use private directly here is fine
+                ...this.cliExcludePatterns,       // Use private directly here is fine
             ];
-             // Optional: Deduplicate if necessary
-             // this.combinedExcludePatterns = [...new Set(this.combinedExcludePatterns)];
+             // Deduplicate using Set for cleaner results
+             this.combinedExcludePatterns = [...new Set(this.combinedExcludePatterns)];
         }
         return this.combinedExcludePatterns;
     }
