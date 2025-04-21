@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GeminiClient = void 0;
 // src/ai.ts
 const generative_ai_1 = require("@google/generative-ai");
-const MODEL_NAME = "gemini-1.5-flash"; // Or choose another suitable model
+const MODEL_NAME = "gemini-2.5-pro-preview-03-25"; // Or choose another suitable model
 class GeminiClient {
     constructor(apiKey) {
         if (!apiKey) {
