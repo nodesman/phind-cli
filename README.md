@@ -11,19 +11,19 @@
 ## Why Another `find` Tool?
 
 The standard `find` command, while powerful, presents several challenges, especially for developers working across different environments:
-*   **AI-Powered Search:** Native `find` requires precise, often complex, patterns. It cannot interpret natural language queries like "find all configuration files" or "show me the test setup".
+1. **AI-Powered Search:** Native `find` requires precise, often complex, patterns. It cannot interpret natural language queries like "find all configuration files" or "show me the test setup".
 
-1.  **Cross-Platform Inconsistency:**
+2. **Cross-Platform Inconsistency:**
     *   The syntax and available options for `find` can differ significantly between operating systems (e.g., GNU `find` on Linux vs. BSD `find` on macOS). This forces users to remember different flags or consult documentation frequently.
     *   **Windows lacks a direct, built-in equivalent.** Developers on Windows often resort to using `dir /s /b`, installing Git Bash (which includes GNU find), using WSL, or employing PowerShell commands, none of which provide the same seamless experience or syntax as Unix-like `find`.
 
-2.  **Verbose and Often Unintuitive Syntax:**
+3.  **Verbose and Often Unintuitive Syntax:**
     *   Standard `find` syntax can be complex, requiring explicit actions like `-print` and involving less intuitive operators for combining conditions (e.g., `-o` for OR, escaped parentheses for grouping).
     *   Excluding directories effectively (pruning) often involves cumbersome patterns like `-path './node_modules' -prune -o -print`.
 
-3.  **Lack of Sensible Defaults for Developers:**
+4. **Lack of Sensible Defaults for Developers:**
     *   **This is a major pain point.** When searching in a typical software project, you almost *never* want to see results from `node_modules`, `.git`, `.gradle`, `build` directories, etc. Standard `find` requires you to *explicitly* exclude these *every single time*. This adds significant boilerplate to common search commands.
-4.  **No User-Level Configuration:**
+5. **No User-Level Configuration:**
     *   Beyond project-specific ignores (like `.gitignore`, which `find` doesn't natively understand anyway), there's no standard way to tell `find` to *always* ignore certain patterns across *all* projects. Think about system files (`.DS_Store`, `Thumbs.db`), editor configuration (`.vscode/`, `.idea/`), temporary files (`*.bak`, `*.swp`), or compiled artifacts (`*.pyc`, `*.o`). With standard `find`, you must *manually add exclusion flags for these user-specific or system-specific nuisances every single time you run a command*, or resort to complex shell aliases or wrapper scripts.
 
 ## The Solution: `phind`
