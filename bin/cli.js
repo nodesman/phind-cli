@@ -43,7 +43,7 @@ class PhindApp {
             type: 'string',
             array: true,
             description: `Glob pattern(s) to exclude. Also reads from ${this.config.getGlobalIgnorePath()} unless --skip-global-ignore is used.`,
-            default: [],
+            default: [], // Keep default as empty array for CLI args
             defaultDescription: this.config.getDefaultExcludesDescription(),
         })
             .option('skip-global-ignore', {
@@ -86,8 +86,8 @@ class PhindApp {
             .option('ai', {
             type: 'string', // Expects the query string
             description: 'Use AI (Google Gemini) to find relevant files based on a natural language query. Requires GEMINI_API_KEY env variable.',
-            // --- FIX: REMOVE 'name' from conflicts ---
-            conflicts: ['exclude', 'type', 'maxdepth', 'ignore-case', 'relative'], // AI mode overrides standard filters/output
+            // --- FIX: REMOVE 'exclude' from conflicts ---
+            conflicts: ['type', 'maxdepth', 'ignore-case', 'relative'], // REMOVED 'exclude'
             // --- END FIX ---
             coerce: (arg) => {
                 if (typeof arg === 'string' && arg.trim() === '') {
@@ -143,9 +143,9 @@ class PhindApp {
                 }
                 // Use only hardcoded and global excludes for AI file collection
                 const aiExcludePatterns = [
-                    // --- FIX: Use getter ---
+                    // --- Use getter ---
                     ...this.config.getHardcodedDefaultExcludes(),
-                    // --- FIX: Use getter ---
+                    // --- Use getter ---
                     ...(argv.skipGlobalIgnore ? [] : this.config.getLoadedGlobalIgnorePatterns())
                 ];
                 const startArgPath = argv.path;
@@ -158,7 +158,7 @@ class PhindApp {
                     maxDepth: Number.MAX_SAFE_INTEGER, // No depth limit
                     ignoreCase: false, // Case doesn't matter for collection
                     relativePaths: true, // ALWAYS use relative paths for AI input
-                    // --- FIX: Use getter ---
+                    // --- Use getter ---
                     defaultExcludes: this.config.getHardcodedDefaultExcludes(),
                     outputMode: 'collect' // CRITICAL: Collect results instead of printing
                 };
@@ -202,7 +202,7 @@ class PhindApp {
                 maxDepth: argv.maxdepth,
                 ignoreCase: argv.ignoreCase,
                 relativePaths: argv.relative,
-                // --- FIX: Use getter ---
+                // --- Use getter ---
                 defaultExcludes: this.config.getHardcodedDefaultExcludes(), // Pass hardcoded defaults for override logic
                 outputMode: 'print' // Standard mode prints directly
             };
