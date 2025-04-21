@@ -86,7 +86,9 @@ class PhindApp {
             .option('ai', {
             type: 'string', // Expects the query string
             description: 'Use AI (Google Gemini) to find relevant files based on a natural language query. Requires GEMINI_API_KEY env variable.',
-            conflicts: ['name', 'exclude', 'type', 'maxdepth', 'ignore-case', 'relative'], // AI mode overrides standard filters/output
+            // --- FIX: REMOVE 'name' from conflicts ---
+            conflicts: ['exclude', 'type', 'maxdepth', 'ignore-case', 'relative'], // AI mode overrides standard filters/output
+            // --- END FIX ---
             coerce: (arg) => {
                 if (typeof arg === 'string' && arg.trim() === '') {
                     throw new Error("The --ai option requires a non-empty query string.");
