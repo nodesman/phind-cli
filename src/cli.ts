@@ -60,12 +60,15 @@ class PhindApp {
                 alias: 'd',
                 type: 'number',
                 description: 'Maximum directory levels to descend (0 means starting path only)',
-                default: Infinity,
+                default: Infinity, // Default is Infinity
                 coerce: (val) => {
                     if (val < 0) {
                         throw new Error("Argument maxdepth must be a non-negative number.");
                     }
-                    return val === Infinity ? Number.MAX_SAFE_INTEGER : val;
+                    // Convert Infinity string/concept to a usable large number for yargs/traverser
+                    // Use Number.MAX_SAFE_INTEGER which is large enough for practical purposes.
+                    // Also handle the actual Infinity value if it somehow gets passed directly.
+                    return val === Infinity || String(val).toLowerCase() === 'infinity' ? Number.MAX_SAFE_INTEGER : val;
                 }
             })
             .option('ignore-case', {
@@ -85,8 +88,8 @@ class PhindApp {
             .option('ai', {
                 type: 'string', // Expects the query string
                 description: 'Use AI (Google Gemini) to find relevant files based on a natural language query. Requires GEMINI_API_KEY env variable.',
-                // --- FIX: REMOVE 'exclude' from conflicts ---
-                conflicts: ['type', 'maxdepth', 'ignore-case', 'relative'], // REMOVED 'exclude'
+                // --- FIX: REMOVE ALL CONFLICTS ---
+                // conflicts: ['type', 'maxdepth', 'ignore-case', 'relative'], // REMOVED THIS LINE ENTIRELY
                 // --- END FIX ---
                 coerce: (arg: any) => {
                      if (typeof arg === 'string' && arg.trim() === '') {
@@ -98,7 +101,7 @@ class PhindApp {
             // --- END: Add AI Option ---
             .help()
             .alias('help', 'h')
-            .strict()
+            .strict() // Keep strict mode to catch truly unknown options
             .argv;
     }
 
@@ -206,11 +209,12 @@ class PhindApp {
             const startPath = await this.validateStartPath(startArgPath);
             const basePath = startPath; // Base path for traversal is the validated start path
 
+             // Pass the coerced maxdepth value directly (it's either a number or MAX_SAFE_INTEGER)
             const traverseOptions: TraverseOptions = {
                 excludePatterns: this.config.getEffectiveExcludePatterns(), // Now gets the combined list
                 includePatterns: argv.name as string[],
                 matchType: argv.type ?? null,
-                maxDepth: argv.maxdepth as number,
+                maxDepth: argv.maxdepth as number, // Pass coerced value
                 ignoreCase: argv.ignoreCase as boolean,
                 relativePaths: argv.relative as boolean,
                 // --- Use getter ---
